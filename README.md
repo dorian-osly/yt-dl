@@ -9,3 +9,7 @@ TO-DO:
 - Add ability to download thumbnails seperately
 - Add a small preview (thumbnail, title, channel, duration) below the YouTube link section
 - Add debug features for nerds lmao
+
+IMPORTANT:
+
+Use QT instead of Electron.
