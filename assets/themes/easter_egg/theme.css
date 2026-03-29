@@ -1,0 +1,40 @@
+html[data-custom-theme="easter_egg"] {
+  --accent: #f8d24a;
+  --accent-text: #241509;
+  --accent-hover: #ffdf73;
+  --bg-primary: #120d09;
+  --bg-secondary: rgba(26, 19, 14, 0.84);
+  --bg-tertiary: rgba(44, 32, 25, 0.88);
+  --bg-hover: rgba(61, 45, 35, 0.94);
+  --text-primary: #fff7e8;
+  --text-secondary: #e9d3aa;
+  --text-muted: #9c8264;
+  --border: rgba(248, 210, 74, 0.22);
+  --success: #7be495;
+  --success-bg: rgba(123, 228, 149, 0.12);
+  --warning: #ffd166;
+  --warning-bg: rgba(255, 209, 102, 0.16);
+}
+
+html[data-custom-theme="easter_egg"] body::before {
+  background-image: url('./background.png');
+  opacity: 0.22;
+}
+
+html[data-custom-theme="easter_egg"] .logo-label {
+  text-shadow: 0 0 18px rgba(248, 210, 74, 0.25);
+}
+
+html[data-custom-theme="easter_egg"] .main-title {
+  max-width: 14ch;
+}
+
+html[data-custom-theme="easter_egg"] .url-input-group,
+html[data-custom-theme="easter_egg"] .segmented-control,
+html[data-custom-theme="easter_egg"] .modern-segmented,
+html[data-custom-theme="easter_egg"] .settings-sidebar,
+html[data-custom-theme="easter_egg"] .settings-content,
+html[data-custom-theme="easter_egg"] .queue-panel,
+html[data-custom-theme="easter_egg"] .theme-card {
+  backdrop-filter: blur(10px);
+}

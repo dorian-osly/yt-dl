@@ -1,0 +1,79 @@
+@font-face {
+  font-family: "theme_deltarune";
+  src: url('./font.ttf') format('truetype');
+  font-display: swap;
+}
+
+html[data-custom-theme="deltarune"] {
+  --font: "theme_deltarune", 'Space Mono', 'Courier New', Courier, monospace;
+  --accent: #ffffff;
+  --accent-text: #03141c;
+  --accent-hover: #ffff00;
+  --bg-primary: #000000;
+  --bg-secondary: #000000;
+  --bg-tertiary: #000000;
+  --bg-hover: #000000;
+  --text-primary: #ffffff;
+  --text-secondary: #9b9b9b;
+  --text-muted: #d1d1d1;
+  --border: #ffffff;
+  --success: #ffff00;
+  --success-bg: #000000;
+  --warning: #00ccff;
+  --warning-bg: #000000;
+  --radius: 0px;
+  --radius-sm: 0px;
+}
+
+html[data-custom-theme="deltarune"] body::before {
+  background-image: url('./background.png');
+  opacity: 0.18;
+}
+
+html[data-custom-theme="deltarune"] .url-input-group,
+html[data-custom-theme="deltarune"] .segmented-control,
+html[data-custom-theme="deltarune"] .queue-panel,
+html[data-custom-theme="deltarune"] .settings-sidebar,
+html[data-custom-theme="deltarune"] .settings-content,
+html[data-custom-theme="deltarune"] .theme-card {
+  border: 2px solid var(--border);
+}
+
+html[data-custom-theme="deltarune"] .segment.active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+html[data-custom-theme="deltarune"] .btn-primary {
+  border: 2px solid var(--accent);
+}
+
+html[data-custom-theme="deltarune"] .btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+html[data-custom-theme="deltarune"] .btn-secondary {
+  border: 2px solid var(--border);
+}
+
+html[data-custom-theme="deltarune"] .modern-segment {
+  border: 2px solid var(--border);
+  padding: 8px 12px;
+}
+
+html[data-custom-theme="deltarune"] .modern-segment.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+html[data-custom-theme="deltarune"] .slider {
+  border: 2px solid var(--border);
+}
+
+html[data-custom-theme="deltarune"] .logo-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 18px rgba(35, 215, 255, 0.32);
+}
