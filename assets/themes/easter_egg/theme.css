@@ -10,23 +10,27 @@ html[data-custom-theme="easter_egg"] {
   --text-secondary: #e9d3aa;
   --text-muted: #9c8264;
   --border: rgba(248, 210, 74, 0.22);
+  --error: #ff6b6b;
+  --error-bg: rgba(255, 107, 107, 0.12);
   --success: #7be495;
   --success-bg: rgba(123, 228, 149, 0.12);
   --warning: #ffd166;
   --warning-bg: rgba(255, 209, 102, 0.16);
+  --overlay-bg: rgba(18, 13, 9, 0.85);
 }
 
 html[data-custom-theme="easter_egg"] body::before {
-  background-image: url('./background.png');
-  opacity: 0.22;
+  opacity: 0.38;
 }
+
 
 html[data-custom-theme="easter_egg"] .logo-label {
   text-shadow: 0 0 18px rgba(248, 210, 74, 0.25);
 }
 
 html[data-custom-theme="easter_egg"] .main-title {
-  max-width: 14ch;
+  font-size: 20px;
+  max-width: 100%;
 }
 
 html[data-custom-theme="easter_egg"] .url-input-group,

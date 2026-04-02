@@ -12,6 +12,8 @@ const onDownloadProgress = exposeListener('download-progress');
 const onDownloadComplete = exposeListener('download-complete');
 const onDownloadFailed = exposeListener('download-failed');
 const onDownloadErrorLog = exposeListener('download-error-log');
+const onDownloadLog = exposeListener('download-log');
+const onDownloadStarted = exposeListener('download-started');
 const onSetupProgress = exposeListener('setup-progress');
 const onSetupError = exposeListener('setup-error');
 
@@ -29,11 +31,16 @@ contextBridge.exposeInMainWorld('api', {
   cancelDownload: () => ipcRenderer.invoke('cancel-download'),
   checkBinaries: () => ipcRenderer.invoke('check-binaries'),
   getVideoTitle: (url) => ipcRenderer.invoke('get-video-title', url),
+  getVideoInfo: (url) => ipcRenderer.invoke('get-video-info', url),
+  getYtdlpVersion: () => ipcRenderer.invoke('get-ytdlp-version'),
+  updateBinaries: () => ipcRenderer.invoke('update-binaries'),
 
   onProgress: onDownloadProgress,
   onComplete: onDownloadComplete,
   onFailed: onDownloadFailed,
   onErrorLog: onDownloadErrorLog,
+  onDownloadLog: onDownloadLog,
+  onDownloadStarted: onDownloadStarted,
   onSetupProgress: onSetupProgress,
   onSetupComplete: (callback) => {
     ipcRenderer.on('setup-complete', () => callback());

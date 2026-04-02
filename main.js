@@ -437,6 +437,45 @@ ipcMain.handle('get-video-title', async (_e, url) => {
   });
 });
 
+ipcMain.handle('get-video-info', async (_e, url) => {
+  return new Promise((resolve) => {
+    const proc = spawn(ytDlpPath, ['--dump-single-json', '--flat-playlist', '--no-download', url], { 
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: spawnEnv
+    });
+    let out = '';
+    proc.stdout.on('data', (d) => { out += d.toString('utf8'); });
+    proc.on('close', () => {
+      try {
+        const info = JSON.parse(out.trim());
+        const title = info.title || 'Inconnu';
+        
+        if (info._type === 'playlist') {
+          resolve({
+            isPlaylist: true,
+            title,
+            channel: info.uploader || info.extractor || '',
+            videoCount: info.entries ? info.entries.length : 0,
+            thumbnail: info.thumbnails && info.thumbnails.length ? info.thumbnails[info.thumbnails.length - 1].url : null,
+            size: 0,
+            duration: 0
+          });
+        } else {
+          const channel = info.uploader || '';
+          const duration = info.duration || 0;
+          const thumbnail = info.thumbnail || '';
+          let size = info.filesize || info.filesize_approx || 0;
+          resolve({ isPlaylist: false, title, channel, duration, thumbnail, size });
+        }
+      } catch (err) {
+        resolve(null);
+      }
+    });
+    proc.on('error', () => resolve(null));
+    setTimeout(() => { try { proc.kill(); } catch {} resolve(null); }, 25000);
+  });
+});
+
 let currentProcess = null;
 
 function getExitReason(code, signal) {
@@ -522,14 +561,36 @@ function buildAudioArgs(url, settings, outputTemplate) {
   return args;
 }
 
-function buildDownloadArgs(url, mode, settings) {
+function sanitizeFolderName(name) {
+  return name
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\.+$/, '')
+    .trim()
+    .slice(0, 150) || 'Playlist';
+}
+
+function buildDownloadArgs(url, mode, settings, isPlaylist = false, playlistTitle = null) {
   const outputDir = settings.downloadFolder || app.getPath('downloads');
-  const outputTemplate = path.join(outputDir, '%(title)s - %(uploader)s.%(ext)s');
+  let outputTemplate;
+  if (isPlaylist) {
+    const folderName = playlistTitle ? sanitizeFolderName(playlistTitle) : '%(playlist_title)s';
+    outputTemplate = path.join(outputDir, folderName, '%(playlist_index)s - %(title)s.%(ext)s');
+  } else {
+    outputTemplate = path.join(outputDir, '%(title)s - %(uploader)s.%(ext)s');
+  }
+
+  const argsInfo = mode === 'video'
+      ? buildVideoArgs(url, settings, outputTemplate)
+      : buildAudioArgs(url, settings, outputTemplate);
+
+  if (isPlaylist) {
+    argsInfo.splice(argsInfo.length - 1, 0, '--yes-playlist');
+  } else {
+    argsInfo.splice(argsInfo.length - 1, 0, '--no-playlist');
+  }
 
   return {
-    args: mode === 'video'
-      ? buildVideoArgs(url, settings, outputTemplate)
-      : buildAudioArgs(url, settings, outputTemplate),
+    args: argsInfo,
     outputDir
   };
 }
@@ -587,7 +648,23 @@ function parseDownloadLine(line, state) {
       percent: parseFloat(progressMatch[1]),
       size: progressMatch[2],
       speed: progressMatch[3],
-      eta: progressMatch[4]
+      eta: progressMatch[4],
+      playlistItem: state.playlistItem || null,
+      playlistTotal: state.playlistTotal || null
+    });
+  }
+
+  const playlistMatch = line.match(/\[download\]\s+Downloading item (\d+) of (\d+)/i);
+  if (playlistMatch) {
+    state.playlistItem = parseInt(playlistMatch[1], 10);
+    state.playlistTotal = parseInt(playlistMatch[2], 10);
+    sendToRenderer('download-progress', {
+      percent: 0,
+      size: '',
+      speed: '',
+      eta: '',
+      playlistItem: state.playlistItem,
+      playlistTotal: state.playlistTotal
     });
   }
 
@@ -611,13 +688,43 @@ function parseDownloadLine(line, state) {
   }
 }
 
-ipcMain.handle('start-download', async (_e, { url, mode }) => {
+ipcMain.handle('get-ytdlp-version', async () => {
+  if (!fs.existsSync(ytDlpPath)) return null;
+  return new Promise((resolve) => {
+    const proc = spawn(ytDlpPath, ['--version'], { stdio: ['pipe', 'pipe', 'pipe'], env: spawnEnv });
+    let out = '';
+    proc.stdout.on('data', (d) => { out += d.toString('utf8'); });
+    proc.on('close', () => resolve(out.trim() || null));
+    proc.on('error', () => resolve(null));
+    setTimeout(() => { try { proc.kill(); } catch {} resolve(null); }, 5000);
+  });
+});
+
+ipcMain.handle('update-binaries', async () => {
+  try {
+    const toDelete = [ytDlpPath, ffmpegPath, ffmpegZipPath];
+    for (const f of toDelete) {
+      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
+    }
+    await ensureBinaries(mainWindow);
+    return true;
+  } catch (err) {
+    return false;
+  }
+});
+
+ipcMain.handle('start-download', async (_e, { url, mode, isPlaylist, playlistTitle, perVideoSettings, verboseMode }) => {
   if (currentProcess) {
     return { success: false, error: 'Un téléchargement est déjà en cours.' };
   }
 
   const settings = loadSettings();
-  const { args, outputDir } = buildDownloadArgs(url, mode, settings);
+  const mergedSettings = perVideoSettings ? { ...settings, ...Object.fromEntries(Object.entries(perVideoSettings).filter(([, v]) => v !== '')) } : settings;
+  const { args, outputDir } = buildDownloadArgs(url, mode, mergedSettings, isPlaylist, playlistTitle);
+  if (verboseMode) args.splice(0, 0, '-v');
+
+  const commandLine = [ytDlpPath, ...args].join(' ');
+  sendToRenderer('download-started', { command: commandLine });
 
   return new Promise((resolve) => {
     const state = { lastFile: '', lastError: '' };
@@ -636,6 +743,7 @@ ipcMain.handle('start-download', async (_e, { url, mode }) => {
     proc.stdout.on('data', (data) => {
       const lines = data.toString().split('\n');
       for (const line of lines) {
+        if (line.trim()) sendToRenderer('download-log', { text: line.trimEnd(), isError: false });
         parseDownloadLine(line, state);
       }
     });
@@ -645,6 +753,9 @@ ipcMain.handle('start-download', async (_e, { url, mode }) => {
       if (text) {
         state.lastError = text;
         sendToRenderer('download-error-log', text);
+        for (const line of text.split('\n')) {
+          if (line.trim()) sendToRenderer('download-log', { text: line.trimEnd(), isError: true });
+        }
       }
     });
 

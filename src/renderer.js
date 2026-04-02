@@ -28,6 +28,32 @@ const setupProgressBar = document.getElementById('setup-progress-bar');
 const queuePanel = document.getElementById('queue-panel');
 const queueList = document.getElementById('queue-list');
 const queueBadge = document.getElementById('queue-badge');
+
+const videoPreview = document.getElementById('video-preview');
+const previewThumbnail = document.getElementById('preview-thumbnail');
+const previewTitle = document.getElementById('preview-title');
+const previewChannel = document.getElementById('preview-channel');
+const previewDuration = document.getElementById('preview-duration');
+const previewSize = document.getElementById('preview-size');
+let previewDebounce = null;
+
+// Per-video settings
+const perVideoSettings = document.getElementById('per-video-settings');
+const perVideoToggle = document.getElementById('per-video-toggle');
+const pvVideoOpts = document.getElementById('pv-video-opts');
+const pvAudioOpts = document.getElementById('pv-audio-opts');
+const pvQuality = document.getElementById('pv-quality');
+const pvCodec = document.getElementById('pv-codec');
+const pvContainer = document.getElementById('pv-container');
+const pvAudioFormat = document.getElementById('pv-audio-format');
+const pvAudioBitrate = document.getElementById('pv-audio-bitrate');
+let perVideoVisible = false;
+
+// Debug
+const logConsole = document.getElementById('log-console');
+let logLines = [];
+let lastCommand = '';
+let verboseModeEnabled = false;
 const queueRingProgress = document.getElementById('queue-ring-progress');
 const openQueueBtn = document.getElementById('open-queue');
 const clearQueueBtn = document.getElementById('clear-queue');
@@ -48,7 +74,7 @@ const SETTINGS_GROUP_IDS = [
 ];
 
 function isValidYouTubeUrl(url) {
-  const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/|embed\/|v\/)|youtu\.be\/|music\.youtube\.com\/watch\?v=)/;
+  const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?|shorts\/|embed\/|v\/|playlist\?)|youtu\.be\/|music\.youtube\.com\/watch\?)/;
   return pattern.test(url.trim());
 }
 
@@ -278,7 +304,11 @@ function setScreen(screen) {
 }
 
 function getQueueDetailParts(item) {
-  const parts = [Math.round(item.percent || 0) + '%'];
+  const parts = [];
+  if (item.playlistItem && item.playlistTotal) {
+    parts.push(`${item.playlistItem}/${item.playlistTotal}`);
+  }
+  parts.push(Math.round(item.percent || 0) + '%');
   if (item.speed) parts.push(item.speed);
   if (item.eta) parts.push('ETA ' + item.eta);
   return parts;
@@ -436,7 +466,11 @@ async function processQueue() {
     try {
       const result = await window.api.startDownload({
         url: next.url,
-        mode: next.mode
+        mode: next.mode,
+        isPlaylist: next.isPlaylist,
+        playlistTitle: next.playlistTitle,
+        perVideoSettings: next.perVideoSettings || null,
+        verboseMode: verboseModeEnabled
       });
 
       if (result.success) {
@@ -488,8 +522,64 @@ pasteBtn.addEventListener('click', async () => {
     urlInput.value = text;
     urlInput.focus();
     hideError();
+    clearTimeout(previewDebounce);
+    previewDebounce = setTimeout(updatePreview, 100);
   } catch {}
 });
+
+urlInput.addEventListener('input', () => {
+  clearTimeout(previewDebounce);
+  videoPreview.classList.add('hidden');
+  previewDebounce = setTimeout(updatePreview, 200);
+});
+
+function formatDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return 'Taille inconnue';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+let currentPreviewInfo = null;
+
+async function updatePreview() {
+  const url = urlInput.value.trim();
+  if (!url || !isValidYouTubeUrl(url)) {
+    videoPreview.classList.add('hidden');
+    currentPreviewInfo = null;
+    return;
+  }
+  
+  const info = await window.api.getVideoInfo(url);
+  if (info && urlInput.value.trim() === url) {
+    currentPreviewInfo = info;
+    previewThumbnail.src = info.thumbnail || '';
+    if (info.isPlaylist) {
+      previewTitle.innerHTML = `<span class="badge" style="background: var(--accent); color: var(--accent-text); padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 6px; vertical-align: middle; font-weight: bold; text-transform: uppercase;">Playlist</span>` + (info.title || 'Inconnu');
+      previewDuration.textContent = `${info.videoCount} vidéos`;
+      previewSize.textContent = 'Playlist';
+    } else {
+      previewTitle.textContent = info.title || 'Inconnu';
+      previewDuration.textContent = formatDuration(info.duration);
+      previewSize.textContent = formatBytes(info.size);
+    }
+    previewTitle.title = info.title;
+    previewChannel.textContent = info.channel || '';
+    videoPreview.classList.remove('hidden');
+  } else if (!info) {
+    currentPreviewInfo = null;
+    videoPreview.classList.add('hidden');
+  }
+}
 
 modeVideo.addEventListener('click', () => setMode('video'));
 modeAudio.addEventListener('click', () => setMode('audio'));
@@ -498,6 +588,17 @@ function setMode(mode) {
   currentMode = mode;
   modeVideo.classList.toggle('active', mode === 'video');
   modeAudio.classList.toggle('active', mode === 'audio');
+  // Sync per-video panels
+  if (pvVideoOpts) pvVideoOpts.classList.toggle('hidden', mode !== 'video');
+  if (pvAudioOpts) pvAudioOpts.classList.toggle('hidden', mode !== 'audio');
+}
+
+if (perVideoToggle) {
+  perVideoToggle.addEventListener('click', () => {
+    perVideoVisible = !perVideoVisible;
+    perVideoSettings.classList.toggle('hidden', !perVideoVisible);
+    perVideoToggle.classList.toggle('active', perVideoVisible);
+  });
 }
 
 downloadBtn.addEventListener('click', startDownload);
@@ -520,21 +621,41 @@ async function startDownload() {
     if (!ready) { showError(t.notReadyError); return; }
 
     const id = ++queueIdCounter;
+    const isPlaylist = currentPreviewInfo && currentPreviewInfo.isPlaylist;
+    const playlistTitle = isPlaylist ? currentPreviewInfo.title : null;
+
+    // Collect per-video overrides (empty string = use global default)
+    const pvSettings = {
+      videoQuality: pvQuality ? pvQuality.value : '',
+      videoCodec: pvCodec ? pvCodec.value : '',
+      videoContainer: pvContainer ? pvContainer.value : '',
+      audioFormat: pvAudioFormat ? pvAudioFormat.value : '',
+      audioBitrate: pvAudioBitrate ? pvAudioBitrate.value : ''
+    };
+    const hasPvOverride = Object.values(pvSettings).some(v => v !== '');
+
     const item = {
       id, url, mode: currentMode,
-      title: url,
+      title: currentPreviewInfo ? currentPreviewInfo.title : url,
+      isPlaylist: isPlaylist,
+      playlistTitle,
+      perVideoSettings: hasPvOverride ? pvSettings : null,
       status: 'waiting',
       percent: 0, speed: '', eta: ''
     };
     queue.push(item);
     urlInput.value = '';
+    currentPreviewInfo = null;
+    videoPreview.classList.add('hidden');
     renderQueue();
     updateQueueBadge();
 
-    window.api.getVideoTitle(url).then(title => {
-      item.title = title;
-      renderQueue();
-    });
+    if (!isPlaylist && item.title === url) {
+      window.api.getVideoTitle(url).then(title => {
+        item.title = title;
+        renderQueue();
+      });
+    }
 
     processQueue();
   } catch (err) {
@@ -555,6 +676,8 @@ window.api.onProgress((data) => {
     active.percent = data.percent;
     active.speed = data.speed || '';
     active.eta = data.eta || '';
+    if (data.playlistItem) active.playlistItem = data.playlistItem;
+    if (data.playlistTotal) active.playlistTotal = data.playlistTotal;
     const el = queueList.querySelector('[data-queue-id="' + active.id + '"]');
     if (el) {
       const bar = el.querySelector('.queue-item-progress-bar');
@@ -584,6 +707,68 @@ window.api.onSetupError((msg) => {
   setupLabel.textContent = 'Erreur : ' + msg;
   setupProgressBar.style.width = '0%';
 });
+
+// ─── Debug: log console ────────────────────────────────
+const MAX_LOG_LINES = 500;
+
+function appendLog(text, isError) {
+  if (!logConsole) return;
+  const placeholder = logConsole.querySelector('.log-placeholder');
+  if (placeholder) placeholder.remove();
+
+  logLines.push({ text, isError });
+  if (logLines.length > MAX_LOG_LINES) logLines.shift();
+
+  const span = document.createElement('span');
+  span.className = isError ? 'log-line-err' : '';
+  span.textContent = text + '\n';
+  logConsole.appendChild(span);
+  logConsole.scrollTop = logConsole.scrollHeight;
+}
+
+window.api.onDownloadLog((data) => {
+  appendLog(data.text, data.isError);
+});
+
+window.api.onDownloadStarted((data) => {
+  if (data && data.command) {
+    lastCommand = data.command;
+    appendLog('▶ ' + data.command, false);
+  }
+});
+
+document.getElementById('clear-log')?.addEventListener('click', () => {
+  if (!logConsole) return;
+  logConsole.innerHTML = '<span class="log-placeholder" data-i18n="logEmpty">En attente...</span>';
+  logLines = [];
+});
+
+document.getElementById('copy-last-cmd')?.addEventListener('click', () => {
+  if (lastCommand) {
+    navigator.clipboard.writeText(lastCommand).catch(() => {});
+  }
+});
+
+document.getElementById('update-binaries')?.addEventListener('click', async () => {
+  const btn = document.getElementById('update-binaries');
+  if (btn) btn.disabled = true;
+  appendLog('Mise à jour des binaires...', false);
+  const ok = await window.api.updateBinaries();
+  appendLog(ok ? 'Binaires mis à jour avec succès.' : 'Échec de la mise à jour.', !ok);
+  if (btn) btn.disabled = false;
+  // Refresh version display
+  const ver = await window.api.getYtdlpVersion();
+  const vEl = document.getElementById('ytdlp-version-display');
+  if (vEl) vEl.textContent = ver || '—';
+});
+
+const verboseToggle = document.getElementById('setting-verbose');
+if (verboseToggle) {
+  verboseToggle.addEventListener('change', (e) => {
+    verboseModeEnabled = e.target.checked;
+    window.api.saveSettings({ verboseMode: e.target.checked });
+  });
+}
 
 openQueueBtn.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -717,6 +902,21 @@ const translations = {
     lblDebug: "debug",
     lblDevTools: "Outils de développement",
     descDevTools: "active la touche F12 pour ouvrir la console DevTools.",
+    lblVerbose: "Mode verbose",
+    descVerbose: "ajoute -v aux commandes yt-dlp pour un log détaillé.",
+    lblYtdlpVersion: "version yt-dlp :",
+    btnUpdateBinaries: "Mettre à jour",
+    lblLogConsole: "console de log",
+    descLogConsole: "sortie en temps réel de yt-dlp.",
+    btnClearLog: "Vider",
+    btnCopyCmd: "Copier la commande",
+    logEmpty: "En attente...",
+    pvQuality: "Qualité",
+    pvCodec: "Codec",
+    pvContainer: "Format",
+    pvAudioFormat: "Format",
+    pvBitrate: "Bitrate",
+    pvDefault: "Par défaut",
     optAuto: "Auto",
     optDefault: "Par défaut",
     optEnabled: "Activées",
@@ -794,6 +994,21 @@ const translations = {
     lblDebug: "debug",
     lblDevTools: "Developer tools",
     descDevTools: "enable the F12 key to open the DevTools console.",
+    lblVerbose: "Verbose mode",
+    descVerbose: "adds -v to yt-dlp commands for detailed logging.",
+    lblYtdlpVersion: "yt-dlp version:",
+    btnUpdateBinaries: "Update",
+    lblLogConsole: "log console",
+    descLogConsole: "real-time yt-dlp output.",
+    btnClearLog: "Clear",
+    btnCopyCmd: "Copy command",
+    logEmpty: "Waiting...",
+    pvQuality: "Quality",
+    pvCodec: "Codec",
+    pvContainer: "Format",
+    pvAudioFormat: "Format",
+    pvBitrate: "Bitrate",
+    pvDefault: "Default",
     optAuto: "Auto",
     optDefault: "Default",
     optEnabled: "Enabled",
@@ -881,6 +1096,15 @@ async function applySettingsToUI(settings) {
 
   const devToolsToggle = document.getElementById('setting-dev-tools');
   if (devToolsToggle) devToolsToggle.checked = settings.devTools || false;
+
+  if (verboseToggle) verboseToggle.checked = settings.verboseMode || false;
+  verboseModeEnabled = settings.verboseMode || false;
+
+  // Fetch and display yt-dlp version
+  window.api.getYtdlpVersion().then((ver) => {
+    const vEl = document.getElementById('ytdlp-version-display');
+    if (vEl) vEl.textContent = ver || '—';
+  });
 }
 
 const themeToggle = document.getElementById('setting-theme-toggle');

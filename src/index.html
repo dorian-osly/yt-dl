@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' file: https://fonts.gstatic.com data:; script-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' file: https://fonts.gstatic.com data:; script-src 'self'; img-src 'self' data: https: http:;">
   <title>YouTube Downloader</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,11 +46,95 @@
             <div id="url-error" class="error-text hidden" data-i18n="invalidLink">Lien invalide</div>
           </div>
 
+          <div id="video-preview" class="video-preview hidden">
+            <img id="preview-thumbnail" class="preview-thumbnail" src="" alt="Thumbnail">
+            <div class="preview-info">
+              <div id="preview-title" class="preview-title"></div>
+              <div id="preview-channel" class="preview-channel"></div>
+              <div class="preview-meta">
+                <span id="preview-duration"></span> • <span id="preview-size"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Per-video override settings -->
+          <div id="per-video-settings" class="per-video-settings hidden">
+            <div id="pv-video-opts" class="pv-opts-group">
+              <div class="pv-row">
+                <label class="pv-label" data-i18n="pvQuality">Qualité</label>
+                <select id="pv-quality" class="pv-select">
+                  <option value="" data-i18n="pvDefault">Par défaut</option>
+                  <option value="best">Auto</option>
+                  <option value="2160">4K</option>
+                  <option value="1440">1440p</option>
+                  <option value="1080">1080p</option>
+                  <option value="720">720p</option>
+                  <option value="480">480p</option>
+                  <option value="360">360p</option>
+                  <option value="240">240p</option>
+                  <option value="144">144p</option>
+                </select>
+              </div>
+              <div class="pv-row">
+                <label class="pv-label" data-i18n="pvCodec">Codec</label>
+                <select id="pv-codec" class="pv-select">
+                  <option value="" data-i18n="pvDefault">Par défaut</option>
+                  <option value="h264">H264</option>
+                  <option value="av1">AV1</option>
+                  <option value="vp9">VP9</option>
+                </select>
+              </div>
+              <div class="pv-row">
+                <label class="pv-label" data-i18n="pvContainer">Format</label>
+                <select id="pv-container" class="pv-select">
+                  <option value="" data-i18n="pvDefault">Par défaut</option>
+                  <option value="auto">Auto</option>
+                  <option value="mp4">MP4</option>
+                  <option value="webm">WebM</option>
+                  <option value="mkv">MKV</option>
+                </select>
+              </div>
+            </div>
+            <div id="pv-audio-opts" class="pv-opts-group hidden">
+              <div class="pv-row">
+                <label class="pv-label" data-i18n="pvAudioFormat">Format</label>
+                <select id="pv-audio-format" class="pv-select">
+                  <option value="" data-i18n="pvDefault">Par défaut</option>
+                  <option value="best" data-i18n="optBest">Meilleur</option>
+                  <option value="mp3">MP3</option>
+                  <option value="ogg">OGG</option>
+                  <option value="wav">WAV</option>
+                  <option value="opus">Opus</option>
+                </select>
+              </div>
+              <div class="pv-row">
+                <label class="pv-label" data-i18n="pvBitrate">Bitrate</label>
+                <select id="pv-audio-bitrate" class="pv-select">
+                  <option value="" data-i18n="pvDefault">Par défaut</option>
+                  <option value="320">320k</option>
+                  <option value="256">256k</option>
+                  <option value="128">128k</option>
+                  <option value="96">96k</option>
+                  <option value="64">64k</option>
+                  <option value="8">8k</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div class="controls-row">
             <div class="segmented-control">
               <button class="segment active" data-mode="video" id="mode-video" data-i18n="modeVideo">Vidéo</button>
               <button class="segment" data-mode="audio" id="mode-audio" data-i18n="modeAudio">Audio</button>
             </div>
+
+            <!-- Tune button to toggle per-video settings -->
+            <button class="btn-icon no-drag pv-toggle-btn" id="per-video-toggle" title="Options pour ce téléchargement">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+                <circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>
+              </svg>
+            </button>
             
             <div class="controls-spacer"></div>
 
@@ -276,6 +360,35 @@
                     </label>
                   </div>
                   <div class="setting-desc" data-i18n="descDevTools">active la touche F12 pour ouvrir la console DevTools.</div>
+
+                  <div class="setting-row" style="margin-top: 8px;">
+                    <div class="setting-label">
+                      <span data-i18n="lblVerbose">Mode verbose</span>
+                    </div>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="setting-verbose">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  <div class="setting-desc" data-i18n="descVerbose">ajoute -v aux commandes yt-dlp pour un log détaillé.</div>
+
+                  <div class="debug-info-row" style="margin-top: 12px;">
+                    <span class="setting-desc" data-i18n="lblYtdlpVersion">version yt-dlp :</span>
+                    <span class="setting-desc text-mono" id="ytdlp-version-display">—</span>
+                    <button class="btn btn-secondary text-mono btn-small-mono" id="update-binaries" data-i18n="btnUpdateBinaries">Mettre à jour</button>
+                  </div>
+                </div>
+
+                <div class="setting-block">
+                  <div class="setting-header">
+                    <span data-i18n="lblLogConsole">console de log</span>
+                  </div>
+                  <div class="setting-desc" data-i18n="descLogConsole">sortie en temps réel de yt-dlp.</div>
+                  <div class="log-console-toolbar">
+                    <button class="btn btn-secondary text-mono btn-small-mono" id="clear-log" data-i18n="btnClearLog">Vider</button>
+                    <button class="btn btn-secondary text-mono btn-small-mono" id="copy-last-cmd" data-i18n="btnCopyCmd">Copier la commande</button>
+                  </div>
+                  <div class="log-console" id="log-console"><span class="log-placeholder" data-i18n="logEmpty">En attente...</span></div>
                 </div>
               </div>
 

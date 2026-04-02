@@ -244,6 +244,60 @@ body.theme-has-icon .logo::before {
   color: var(--error);
 }
 
+/* ─── Video Preview ────────────────────────────────────── */
+.video-preview {
+  display: flex;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  gap: 16px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.preview-thumbnail {
+  width: 160px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+}
+
+.preview-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  flex: 1;
+}
+
+.preview-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.preview-channel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.preview-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* ─── Controls Row (Mode/Format/Submit) ───────────────── */
 .controls-row {
   display: flex;
@@ -1068,4 +1122,132 @@ input:checked + .slider:before {
   width: 0%;
   transition: width 0.3s ease;
   border-radius: 2px;
+}
+
+/* ─── Per-video settings panel ────────────────────────── */
+.per-video-settings {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  animation: fadeIn 0.15s ease;
+}
+
+.per-video-settings.hidden {
+  display: none !important;
+}
+
+.pv-opts-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pv-opts-group.hidden {
+  display: none !important;
+}
+
+.pv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pv-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pv-select {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 5px 8px;
+  cursor: pointer;
+  transition: border-color var(--transition);
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 22px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+
+.pv-select:focus {
+  outline: none;
+  border-color: var(--text-muted);
+}
+
+.pv-toggle-btn {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.pv-toggle-btn.active {
+  color: var(--accent);
+  background: rgba(var(--accent-rgb, 255,255,255), 0.08);
+}
+
+/* ─── Debug: log console ──────────────────────────────── */
+.log-console {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--text-secondary);
+  height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.55;
+  scroll-behavior: smooth;
+}
+
+.log-line-err {
+  color: var(--error);
+}
+
+.log-line-ok {
+  color: var(--success);
+}
+
+.log-placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.log-console-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+/* ─── Debug: info row ─────────────────────────────────── */
+.debug-info-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.setting-label {
+  font-size: 14px;
+  color: var(--text-primary);
 }
