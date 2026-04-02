@@ -409,6 +409,12 @@ ipcMain.handle('open-folder', (_e, folderPath) => {
   shell.openPath(folderPath);
 });
 
+ipcMain.handle('open-external', (_e, url) => {
+  if (typeof url === 'string' && url.startsWith('https://')) {
+    shell.openExternal(url);
+  }
+});
+
 ipcMain.handle('check-binaries', () => {
   return fs.existsSync(ytDlpPath) && fs.existsSync(ffmpegPath);
 });

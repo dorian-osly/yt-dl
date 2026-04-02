@@ -749,6 +749,10 @@ document.getElementById('copy-last-cmd')?.addEventListener('click', () => {
   }
 });
 
+document.getElementById('credits-github-btn')?.addEventListener('click', () => {
+  window.api.openExternal('https://github.com/dorian-osly');
+});
+
 document.getElementById('update-binaries')?.addEventListener('click', async () => {
   const btn = document.getElementById('update-binaries');
   if (btn) btn.disabled = true;
@@ -899,7 +903,7 @@ const translations = {
     btnImport: "Importer",
     btnExport: "Exporter",
     btnReset: "Réinitialiser",
-    lblDebug: "debug",
+    lblDebug: "Debug",
     lblDevTools: "Outils de développement",
     descDevTools: "active la touche F12 pour ouvrir la console DevTools.",
     lblVerbose: "Mode verbose",
@@ -922,7 +926,9 @@ const translations = {
     optEnabled: "Activées",
     optMinimal: "Minimales",
     optDisabled: "Désactivées",
-    optBest: "Meilleur"
+    optBest: "Meilleur",
+    tabCredits: "Crédits",
+    lblDeveloper: "Développeur"
   },
   en: {
     setupTitle: "Initializing...",
@@ -991,7 +997,7 @@ const translations = {
     btnImport: "Import",
     btnExport: "Export",
     btnReset: "Reset",
-    lblDebug: "debug",
+    lblDebug: "Debug",
     lblDevTools: "Developer tools",
     descDevTools: "enable the F12 key to open the DevTools console.",
     lblVerbose: "Verbose mode",
@@ -1014,7 +1020,9 @@ const translations = {
     optEnabled: "Enabled",
     optMinimal: "Minimal",
     optDisabled: "Disabled",
-    optBest: "Best"
+    optBest: "Best",
+    tabCredits: "Credits",
+    lblDeveloper: "Developer"
   }
 };
 
