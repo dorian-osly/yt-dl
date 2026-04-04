@@ -753,6 +753,14 @@ document.getElementById('credits-github-btn')?.addEventListener('click', () => {
   window.api.openExternal('https://github.com/dorian-osly');
 });
 
+document.getElementById('credits-ytdlp-btn')?.addEventListener('click', () => {
+  window.api.openExternal('https://github.com/yt-dlp/yt-dlp');
+});
+
+document.getElementById('credits-ffmpeg-btn')?.addEventListener('click', () => {
+  window.api.openExternal('https://ffmpeg.org');
+});
+
 document.getElementById('update-binaries')?.addEventListener('click', async () => {
   const btn = document.getElementById('update-binaries');
   if (btn) btn.disabled = true;
@@ -905,13 +913,13 @@ const translations = {
     btnReset: "Réinitialiser",
     lblDebug: "Debug",
     lblDevTools: "Outils de développement",
-    descDevTools: "active la touche F12 pour ouvrir la console DevTools.",
+    descDevTools: "Active la touche F12 pour ouvrir la console DevTools.",
     lblVerbose: "Mode verbose",
-    descVerbose: "ajoute -v aux commandes yt-dlp pour un log détaillé.",
+    descVerbose: "Ajoute -v aux commandes yt-dlp pour un log détaillé.",
     lblYtdlpVersion: "version yt-dlp :",
     btnUpdateBinaries: "Mettre à jour",
-    lblLogConsole: "console de log",
-    descLogConsole: "sortie en temps réel de yt-dlp.",
+    lblLogConsole: "Console de log",
+    descLogConsole: "Sortie en temps réel de yt-dlp.",
     btnClearLog: "Vider",
     btnCopyCmd: "Copier la commande",
     logEmpty: "En attente...",
@@ -999,13 +1007,13 @@ const translations = {
     btnReset: "Reset",
     lblDebug: "Debug",
     lblDevTools: "Developer tools",
-    descDevTools: "enable the F12 key to open the DevTools console.",
+    descDevTools: "Enable the F12 key to open the DevTools console.",
     lblVerbose: "Verbose mode",
-    descVerbose: "adds -v to yt-dlp commands for detailed logging.",
+    descVerbose: "Adds -v to yt-dlp commands for detailed logging.",
     lblYtdlpVersion: "yt-dlp version:",
     btnUpdateBinaries: "Update",
-    lblLogConsole: "log console",
-    descLogConsole: "real-time yt-dlp output.",
+    lblLogConsole: "Log console",
+    descLogConsole: "Real-time yt-dlp output.",
     btnClearLog: "Clear",
     btnCopyCmd: "Copy command",
     logEmpty: "Waiting...",

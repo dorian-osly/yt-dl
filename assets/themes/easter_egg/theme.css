@@ -40,5 +40,11 @@ html[data-custom-theme="easter_egg"] .settings-sidebar,
 html[data-custom-theme="easter_egg"] .settings-content,
 html[data-custom-theme="easter_egg"] .queue-panel,
 html[data-custom-theme="easter_egg"] .theme-card {
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(4px);
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+html[data-custom-theme="easter_egg"] .screen {
+  will-change: transform, opacity;
 }
