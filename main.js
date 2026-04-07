@@ -41,6 +41,7 @@ const defaultSettings = {
   audioFormat: 'best',
   audioBitrate: '320',
   audioTrack: 'auto',
+  embedThumbnail: true,
   devTools: false
 };
 
@@ -409,12 +410,6 @@ ipcMain.handle('open-folder', (_e, folderPath) => {
   shell.openPath(folderPath);
 });
 
-ipcMain.handle('open-external', (_e, url) => {
-  if (typeof url === 'string' && url.startsWith('https://')) {
-    shell.openExternal(url);
-  }
-});
-
 ipcMain.handle('check-binaries', () => {
   return fs.existsSync(ytDlpPath) && fs.existsSync(ffmpegPath);
 });
@@ -561,6 +556,10 @@ function buildAudioArgs(url, settings, outputTemplate) {
   if (settings.audioFormat && settings.audioFormat !== 'best') {
     args.push('--audio-format', settings.audioFormat);
     args.push('--audio-quality', settings.audioBitrate ? `${settings.audioBitrate}K` : '0');
+  }
+
+  if (settings.embedThumbnail !== false) {
+    args.push('--embed-thumbnail', '--convert-thumbnail', 'jpg');
   }
 
   args.push(url);

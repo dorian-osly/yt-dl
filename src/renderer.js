@@ -749,18 +749,6 @@ document.getElementById('copy-last-cmd')?.addEventListener('click', () => {
   }
 });
 
-document.getElementById('credits-github-btn')?.addEventListener('click', () => {
-  window.api.openExternal('https://github.com/dorian-osly');
-});
-
-document.getElementById('credits-ytdlp-btn')?.addEventListener('click', () => {
-  window.api.openExternal('https://github.com/yt-dlp/yt-dlp');
-});
-
-document.getElementById('credits-ffmpeg-btn')?.addEventListener('click', () => {
-  window.api.openExternal('https://ffmpeg.org');
-});
-
 document.getElementById('update-binaries')?.addEventListener('click', async () => {
   const btn = document.getElementById('update-binaries');
   if (btn) btn.disabled = true;
@@ -905,21 +893,23 @@ const translations = {
     descVideoContainer: "Quand \"auto\" est sélectionné, le format idéal sera choisi en fonction du codec.",
     lblAudioFormat: "Format audio",
     lblAudioBitrate: "Bitrate audio",
+    lblEmbedThumbnail: "Intégrer la miniature",
+    descEmbedThumbnail: "Intègre la miniature YouTube comme pochette dans le fichier audio.",
     lblAudioTrack: "Piste audio",
     lblConfig: "Données de configuration",
     descConfig: "Importer ou exporter vos préférences au format JSON.",
     btnImport: "Importer",
     btnExport: "Exporter",
     btnReset: "Réinitialiser",
-    lblDebug: "Debug",
+    lblDebug: "debug",
     lblDevTools: "Outils de développement",
-    descDevTools: "Active la touche F12 pour ouvrir la console DevTools.",
+    descDevTools: "active la touche F12 pour ouvrir la console DevTools.",
     lblVerbose: "Mode verbose",
-    descVerbose: "Ajoute -v aux commandes yt-dlp pour un log détaillé.",
+    descVerbose: "ajoute -v aux commandes yt-dlp pour un log détaillé.",
     lblYtdlpVersion: "version yt-dlp :",
     btnUpdateBinaries: "Mettre à jour",
-    lblLogConsole: "Console de log",
-    descLogConsole: "Sortie en temps réel de yt-dlp.",
+    lblLogConsole: "console de log",
+    descLogConsole: "sortie en temps réel de yt-dlp.",
     btnClearLog: "Vider",
     btnCopyCmd: "Copier la commande",
     logEmpty: "En attente...",
@@ -934,9 +924,7 @@ const translations = {
     optEnabled: "Activées",
     optMinimal: "Minimales",
     optDisabled: "Désactivées",
-    optBest: "Meilleur",
-    tabCredits: "Crédits",
-    lblDeveloper: "Développeur"
+    optBest: "Meilleur"
   },
   en: {
     setupTitle: "Initializing...",
@@ -999,21 +987,23 @@ const translations = {
     descVideoContainer: "When \"auto\" is selected, the most suitable container is chosen from the selected codec.",
     lblAudioFormat: "Audio format",
     lblAudioBitrate: "Audio bitrate",
+    lblEmbedThumbnail: "Embed thumbnail",
+    descEmbedThumbnail: "Embeds the YouTube thumbnail as cover art in the audio file.",
     lblAudioTrack: "Audio track",
     lblConfig: "Configuration data",
     descConfig: "Import or export your preferences in JSON format.",
     btnImport: "Import",
     btnExport: "Export",
     btnReset: "Reset",
-    lblDebug: "Debug",
+    lblDebug: "debug",
     lblDevTools: "Developer tools",
-    descDevTools: "Enable the F12 key to open the DevTools console.",
+    descDevTools: "enable the F12 key to open the DevTools console.",
     lblVerbose: "Verbose mode",
-    descVerbose: "Adds -v to yt-dlp commands for detailed logging.",
+    descVerbose: "adds -v to yt-dlp commands for detailed logging.",
     lblYtdlpVersion: "yt-dlp version:",
     btnUpdateBinaries: "Update",
-    lblLogConsole: "Log console",
-    descLogConsole: "Real-time yt-dlp output.",
+    lblLogConsole: "log console",
+    descLogConsole: "real-time yt-dlp output.",
     btnClearLog: "Clear",
     btnCopyCmd: "Copy command",
     logEmpty: "Waiting...",
@@ -1028,9 +1018,7 @@ const translations = {
     optEnabled: "Enabled",
     optMinimal: "Minimal",
     optDisabled: "Disabled",
-    optBest: "Best",
-    tabCredits: "Credits",
-    lblDeveloper: "Developer"
+    optBest: "Best"
   }
 };
 
@@ -1116,6 +1104,9 @@ async function applySettingsToUI(settings) {
   if (verboseToggle) verboseToggle.checked = settings.verboseMode || false;
   verboseModeEnabled = settings.verboseMode || false;
 
+  const embedThumbnailToggle = document.getElementById('setting-embed-thumbnail');
+  if (embedThumbnailToggle) embedThumbnailToggle.checked = settings.embedThumbnail !== false;
+
   // Fetch and display yt-dlp version
   window.api.getYtdlpVersion().then((ver) => {
     const vEl = document.getElementById('ytdlp-version-display');
@@ -1134,6 +1125,13 @@ const devToolsToggle = document.getElementById('setting-dev-tools');
 if (devToolsToggle) {
   devToolsToggle.addEventListener('change', (e) => {
     window.api.saveSettings({ devTools: e.target.checked });
+  });
+}
+
+const embedThumbnailToggle = document.getElementById('setting-embed-thumbnail');
+if (embedThumbnailToggle) {
+  embedThumbnailToggle.addEventListener('change', (e) => {
+    window.api.saveSettings({ embedThumbnail: e.target.checked });
   });
 }
 

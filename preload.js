@@ -23,7 +23,6 @@ contextBridge.exposeInMainWorld('api', {
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
-  openExternal: (url) => ipcRenderer.invoke('open-external', url),
   importConfig: () => ipcRenderer.invoke('import-config'),
   exportConfig: () => ipcRenderer.invoke('export-config'),
   resetConfig: () => ipcRenderer.invoke('reset-config'),
