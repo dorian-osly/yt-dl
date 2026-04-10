@@ -416,7 +416,7 @@ ipcMain.handle('check-binaries', () => {
 
 ipcMain.handle('get-video-title', async (_e, url) => {
   return new Promise((resolve) => {
-    const proc = spawn(ytDlpPath, ['--dump-json', '--no-playlist', '--no-download', url], { 
+    const proc = spawn(ytDlpPath, ['--dump-json', '--no-playlist', '--no-download', '--extractor-args', 'youtube:player_client=ios,web', url], { 
       stdio: ['pipe', 'pipe', 'pipe'],
       env: spawnEnv
     });
@@ -440,7 +440,7 @@ ipcMain.handle('get-video-title', async (_e, url) => {
 
 ipcMain.handle('get-video-info', async (_e, url) => {
   return new Promise((resolve) => {
-    const proc = spawn(ytDlpPath, ['--dump-single-json', '--flat-playlist', '--no-download', url], { 
+    const proc = spawn(ytDlpPath, ['--dump-single-json', '--flat-playlist', '--no-download', '--extractor-args', 'youtube:player_client=ios,web', url], { 
       stdio: ['pipe', 'pipe', 'pipe'],
       env: spawnEnv
     });
@@ -528,7 +528,8 @@ function buildVideoArgs(url, settings, outputTemplate) {
     '-o', outputTemplate,
     '--ffmpeg-location', binDir,
     '--newline',
-    '--no-mtime'
+    '--no-mtime',
+    '--extractor-args', 'youtube:player_client=ios,web'
   ];
 
   if (settings.videoContainer === 'auto') {
@@ -550,7 +551,8 @@ function buildAudioArgs(url, settings, outputTemplate) {
     '-o', outputTemplate,
     '--ffmpeg-location', binDir,
     '--newline',
-    '--no-mtime'
+    '--no-mtime',
+    '--extractor-args', 'youtube:player_client=ios,web'
   ];
 
   if (settings.audioFormat && settings.audioFormat !== 'best') {
