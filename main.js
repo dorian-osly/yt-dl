@@ -23,6 +23,8 @@ const themesDir = path.join(__dirname, 'assets', 'themes');
 const ytDlpPath = path.join(binDir, 'yt-dlp.exe');
 const ffmpegPath = path.join(binDir, 'ffmpeg.exe');
 const ffmpegZipPath = path.join(binDir, 'ffmpeg.zip');
+const denoPath = path.join(binDir, 'deno.exe');
+const denoZipPath = path.join(binDir, 'deno.zip');
 const spawnEnv = {
   ...process.env,
   PYTHONIOENCODING: 'utf-8',
@@ -57,6 +59,12 @@ const binarySources = [
     downloadTo: ffmpegZipPath,
     label: 'ffmpeg',
     url: 'https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'
+  },
+  {
+    existsAt: denoPath,
+    downloadTo: denoZipPath,
+    label: 'deno',
+    url: 'https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip'
   }
 ];
 
@@ -246,8 +254,44 @@ async function ensureBinaries(win) {
     try { fs.unlinkSync(ffmpegZipPath); } catch {}
   }
 
+  if (fs.existsSync(denoZipPath) && !fs.existsSync(denoPath)) {
+    if (win) win.webContents.send('setup-progress', { label: 'deno', percent: '99' });
+    await extractSingleExeFromZip(denoZipPath, 'deno.exe');
+    try { fs.unlinkSync(denoZipPath); } catch {}
+  }
+
   if (win) win.webContents.send('setup-complete');
   return true;
+}
+
+async function extractSingleExeFromZip(zipPath, exeName) {
+  return new Promise((resolve, reject) => {
+    const ps = spawn('powershell', [
+      '-NoProfile', '-Command',
+      `
+      $zip = '${zipPath.replace(/'/g, "''")}';
+      $dest = '${binDir.replace(/'/g, "''")}';
+      Add-Type -AssemblyName System.IO.Compression.FileSystem;
+      $archive = [System.IO.Compression.ZipFile]::OpenRead($zip);
+      foreach ($entry in $archive.Entries) {
+        if ($entry.Name -eq '${exeName}') {
+          $stream = $entry.Open();
+          $fileStream = [System.IO.File]::Create("$dest\\${exeName}");
+          $stream.CopyTo($fileStream);
+          $fileStream.Close();
+          $stream.Close();
+          break;
+        }
+      }
+      $archive.Dispose();
+      `
+    ], { stdio: 'pipe' });
+    ps.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${exeName} extraction failed (code ${code})`));
+    });
+    ps.on('error', reject);
+  });
 }
 
 async function extractFfmpegFromZip(zipPath) {
@@ -416,7 +460,7 @@ ipcMain.handle('check-binaries', () => {
 
 ipcMain.handle('get-video-title', async (_e, url) => {
   return new Promise((resolve) => {
-    const proc = spawn(ytDlpPath, ['--dump-json', '--no-playlist', '--no-download', '--extractor-args', 'youtube:player_client=ios,web', url], { 
+    const proc = spawn(ytDlpPath, ['--dump-json', '--no-playlist', '--no-download', '--js-runtimes', `deno:${denoPath}`, url], { 
       stdio: ['pipe', 'pipe', 'pipe'],
       env: spawnEnv
     });
@@ -440,7 +484,7 @@ ipcMain.handle('get-video-title', async (_e, url) => {
 
 ipcMain.handle('get-video-info', async (_e, url) => {
   return new Promise((resolve) => {
-    const proc = spawn(ytDlpPath, ['--dump-single-json', '--flat-playlist', '--no-download', '--extractor-args', 'youtube:player_client=ios,web', url], { 
+    const proc = spawn(ytDlpPath, ['--dump-single-json', '--flat-playlist', '--no-download', '--js-runtimes', `deno:${denoPath}`, url], { 
       stdio: ['pipe', 'pipe', 'pipe'],
       env: spawnEnv
     });
@@ -529,7 +573,7 @@ function buildVideoArgs(url, settings, outputTemplate) {
     '--ffmpeg-location', binDir,
     '--newline',
     '--no-mtime',
-    '--extractor-args', 'youtube:player_client=ios,web'
+    '--js-runtimes', `deno:${denoPath}`
   ];
 
   if (settings.videoContainer === 'auto') {
@@ -552,7 +596,7 @@ function buildAudioArgs(url, settings, outputTemplate) {
     '--ffmpeg-location', binDir,
     '--newline',
     '--no-mtime',
-    '--extractor-args', 'youtube:player_client=ios,web'
+    '--js-runtimes', `deno:${denoPath}`
   ];
 
   if (settings.audioFormat && settings.audioFormat !== 'best') {
