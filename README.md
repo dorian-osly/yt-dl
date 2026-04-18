@@ -7,6 +7,12 @@ All notable changes to **yt-dl** will be documented in this file.
 
 ---
 
+## [1.2.3] - 2026-04-18
+
+### Changed
+
+- Fixed the CSS not adapting properly when the window is in a smaller form factor.
+
 ## [1.2.2] - 2026-04-18
 
 ### Added
