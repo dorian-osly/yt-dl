@@ -566,25 +566,31 @@ body.theme-has-icon .logo::before {
 .settings-main {
   padding: 0 !important;
   margin: 0 !important;
-  height: 100%;
+  min-height: 0 !important;
   max-width: none !important;
+  overflow: hidden;
+  justify-content: flex-start !important;
 }
 
 .settings-layout {
   display: flex;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   background: var(--bg-primary);
 }
 
 .settings-sidebar {
   width: 220px;
+  min-width: 220px;
   background: var(--bg-primary);
   border-right: 1px solid var(--border);
   padding: 24px 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition: width var(--transition), min-width var(--transition), padding var(--transition);
+  overflow: hidden;
 }
 
 .sidebar-link {
@@ -602,6 +608,8 @@ body.theme-has-icon .logo::before {
   cursor: pointer;
   transition: all var(--transition);
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .sidebar-link:hover {
@@ -623,6 +631,7 @@ body.theme-has-icon .logo::before {
   padding: 24px 32px;
   overflow-y: auto;
   background: var(--bg-primary);
+  min-width: 0;
 }
 
 .settings-pane {
@@ -647,6 +656,7 @@ body.theme-has-icon .logo::before {
 .folder-row {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .folder-display {
@@ -775,11 +785,13 @@ body.theme-has-icon .logo::before {
 
 .modern-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 4px;
 }
 
 .modern-segment {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   padding: 10px 14px;
@@ -790,6 +802,7 @@ body.theme-has-icon .logo::before {
   cursor: pointer;
   transition: all var(--transition);
   text-align: center;
+  white-space: nowrap;
 }
 
 .action-strip {
@@ -969,6 +982,7 @@ input:checked + .slider:before {
   top: 62px;
   right: 16px;
   width: 440px;
+  max-width: calc(100vw - 32px);
   max-height: 480px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
@@ -1207,6 +1221,7 @@ input:checked + .slider:before {
   font-size: 11px;
   color: var(--text-secondary);
   height: 220px;
+  max-height: 40vh;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
@@ -1299,4 +1314,73 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* ─── Responsive: narrow windows ───────────────────────── */
+
+@media (max-width: 850px) {
+  .settings-sidebar {
+    width: 56px;
+    min-width: 56px;
+    padding: 24px 8px;
+    align-items: center;
+  }
+
+  .sidebar-link {
+    padding: 10px;
+    justify-content: center;
+  }
+
+  .sidebar-link span {
+    display: none;
+  }
+
+  .settings-content {
+    padding: 24px 20px;
+  }
+
+  .settings-pane {
+    max-width: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .settings-sidebar {
+    width: 48px;
+    min-width: 48px;
+    padding: 16px 4px;
+  }
+
+  .sidebar-link {
+    padding: 8px;
+  }
+
+  .settings-content {
+    padding: 16px 12px;
+  }
+
+  .modern-segmented {
+    flex-wrap: wrap;
+  }
+
+  .modern-segment {
+    flex: unset;
+    flex-grow: 1;
+    min-width: fit-content;
+  }
+
+  .modern-grid {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  }
+
+  .theme-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .queue-panel {
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+  }
 }
