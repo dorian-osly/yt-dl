@@ -1,1 +1,0 @@
-const os = require('os'); const cp = require('child_process'); const p = require('path').join(os.homedir(), 'AppData', 'Roaming', 'yt-dl', 'bin', 'yt-dlp.exe'); cp.execSync('\x22' + p + '\x22 --dump-single-json --flat-playlist \x22https://www.youtube.com/playlist?list=PL4lcaoLx_o42C97-eNfUuC7bH02u70B-s\x22', {stdio: 'inherit'});

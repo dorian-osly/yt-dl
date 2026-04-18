@@ -6,6 +6,10 @@ let processingQueue = false;
 let availableThemes = [];
 let selectedCustomThemeId = 'default';
 let preferredThemeMode = 'dark';
+let currentPreviewInfo = null;
+let previewDebounce = null;
+let perVideoVisible = false;
+let verboseModeEnabled = false;
 
 const urlInput = document.getElementById('url-input');
 const urlError = document.getElementById('url-error');
@@ -35,9 +39,7 @@ const previewTitle = document.getElementById('preview-title');
 const previewChannel = document.getElementById('preview-channel');
 const previewDuration = document.getElementById('preview-duration');
 const previewSize = document.getElementById('preview-size');
-let previewDebounce = null;
 
-// Per-video settings
 const perVideoSettings = document.getElementById('per-video-settings');
 const perVideoToggle = document.getElementById('per-video-toggle');
 const pvVideoOpts = document.getElementById('pv-video-opts');
@@ -47,13 +49,11 @@ const pvCodec = document.getElementById('pv-codec');
 const pvContainer = document.getElementById('pv-container');
 const pvAudioFormat = document.getElementById('pv-audio-format');
 const pvAudioBitrate = document.getElementById('pv-audio-bitrate');
-let perVideoVisible = false;
 
-// Debug
 const logConsole = document.getElementById('log-console');
 let logLines = [];
 let lastCommand = '';
-let verboseModeEnabled = false;
+const MAX_LOG_LINES = 500;
 const queueRingProgress = document.getElementById('queue-ring-progress');
 const openQueueBtn = document.getElementById('open-queue');
 const clearQueueBtn = document.getElementById('clear-queue');
@@ -70,18 +70,348 @@ const SETTINGS_GROUP_IDS = [
   'setting-video-container',
   'setting-audio-format',
   'setting-audio-bitrate',
-  'setting-audio-track'
+  'setting-audio-track',
+  'setting-subs-lang',
+  'setting-sponsorblock'
 ];
 
+const RING_CIRCUMFERENCE = 2 * Math.PI * 18;
+
+// ─── i18n ─────────────────────────────────────────────
+const translations = {
+  fr: {
+    setupTitle: "Initialisation...",
+    setupLabel: "Préparation de l'environnement",
+    mainTitle: "Que souhaitez-vous télécharger ?",
+    linkPlaceholder: "Lien YouTube...",
+    pasteBtn: "Coller",
+    invalidLink: "Lien invalide",
+    modeVideo: "Vidéo",
+    modeAudio: "Audio",
+    downloadBtn: "Télécharger",
+    downloading: "Téléchargement...",
+    cancelBtn: "Annuler",
+    speedCalc: "Calcul...",
+    settingsTitle: "Paramètres",
+    backBtn: "Retour",
+    emptyUrlError: "Veuillez entrer une URL.",
+    invalidUrlError: "Veuillez entrer une URL YouTube valide.",
+    notReadyError: "Les composants ne sont pas encore prêts. Patientez...",
+    downloadCancelLog: "Téléchargement annulé.",
+    downloadSuccessLog: "Téléchargement terminé !",
+    openFolderLog: "Ouvrir le dossier",
+    unknownError: "Erreur inconnue",
+    importSuccess: "Configuration importée avec succès !",
+    exportSuccess: "Configuration exportée avec succès !",
+    resetConfirm: "Voulez-vous vraiment réinitialiser la configuration ?",
+    queueTitle: "File d'attente",
+    queueEmpty: "Aucun téléchargement en cours",
+    queueActive: "En cours",
+    queueWaiting: "En attente",
+    queueDone: "Terminé",
+    queueError: "Erreur",
+    queueCancelled: "Annulé",
+    queueSomeErrors: "Certains téléchargements ont échoué.",
+    queueSomeCancelled: "Téléchargements terminés, certains ont été annulés.",
+    queueClear: "vider",
+    tabGeneral: "Général",
+    tabAppearance: "Apparence",
+    tabVideo: "Vidéo",
+    tabAudio: "Audio",
+    tabAdvanced: "Avancé",
+    tabHistory: "Historique",
+    lblDownloadFolder: "Dossier de destination",
+    descDownloadFolder: "L'emplacement où les fichiers seront sauvegardés.",
+    btnModify: "Modifier",
+    lblTheme: "Mode sombre",
+    descTheme: "Bascule entre les thèmes clair et sombre.",
+    lblCustomTheme: "Thèmes",
+    descCustomTheme: "Choisissez un habillage chargé depuis le dossier assets/themes.",
+    themeDefaultName: "Aucun thème",
+    themeDefaultDesc: "Utilise seulement le thème clair ou sombre intégré.",
+    themeEmpty: "Aucun thème détecté pour le moment.",
+    themeFolderHint: "Créez un dossier dans assets/themes/NOM avec theme.css, background.png, icon.png, et éventuellement banner.png et font.ttf ou font.otf.",
+    lblLanguage: "Langue",
+    lblAnimations: "Animations",
+    lblVideoQuality: "Qualité vidéo",
+    descVideoQuality: "Si la qualité préférée n'est pas disponible, la suivante la plus proche sera sélectionnée.",
+    lblVideoCodec: "Codec vidéo préféré",
+    descVideoCodec: "H264 : meilleure compatibilité. max 1080p.\nAV1 : meilleure qualité/taille. supporte 4k/8k HDR.\nVP9 : supporte 4k HDR.\n\nAV1 et VP9 ne sont pas supportés partout, vous pourriez avoir besoin d'un logiciel supplémentaire pour les lire.",
+    lblVideoContainer: "Conteneur vidéo",
+    descVideoContainer: "Quand \"auto\" est sélectionné, le format idéal sera choisi en fonction du codec.",
+    lblAudioFormat: "Format audio",
+    lblAudioBitrate: "Bitrate audio",
+    lblEmbedThumbnail: "Intégrer la miniature",
+    descEmbedThumbnail: "Intègre la miniature YouTube comme pochette dans le fichier audio.",
+    lblAudioTrack: "Piste audio",
+    lblWriteSubs: "Sous-titres",
+    descWriteSubs: "Télécharge les sous-titres si disponibles.",
+    lblSubsLang: "Langue des sous-titres",
+    lblSponsorblock: "SponsorBlock",
+    descSponsorblock: "Marque les segments sponsorisés dans la barre de progression du lecteur vidéo.",
+    optSponsorblockNone: "Désactivé",
+    optSponsorblockAll: "Tout marquer",
+    lblDisableGpu: "Désactiver l'accélération GPU",
+    descDisableGpu: "À activer si l'application crash au lancement. Nécessite un redémarrage.",
+    lblConfig: "Données de configuration",
+    descConfig: "Importer ou exporter vos préférences au format JSON.",
+    btnImport: "Importer",
+    btnExport: "Exporter",
+    btnReset: "Réinitialiser",
+    lblDebug: "debug",
+    lblDevTools: "Outils de développement",
+    descDevTools: "active la touche F12 pour ouvrir la console DevTools.",
+    lblVerbose: "Mode verbose",
+    descVerbose: "ajoute -v aux commandes yt-dlp pour un log détaillé.",
+    lblYtdlpVersion: "version yt-dlp :",
+    btnUpdateBinaries: "Mettre à jour",
+    lblLogConsole: "console de log",
+    descLogConsole: "sortie en temps réel de yt-dlp.",
+    btnClearLog: "Vider",
+    btnCopyCmd: "Copier la commande",
+    logEmpty: "En attente...",
+    pvQuality: "Qualité",
+    pvCodec: "Codec",
+    pvContainer: "Format",
+    pvAudioFormat: "Format",
+    pvBitrate: "Bitrate",
+    pvDefault: "Par défaut",
+    optAuto: "Auto",
+    optDefault: "Par défaut",
+    optEnabled: "Activées",
+    optMinimal: "Minimales",
+    optDisabled: "Désactivées",
+    optBest: "Meilleur",
+    optNone: "Aucun",
+    historyTitle: "Historique",
+    historyEmpty: "Aucun téléchargement dans l'historique.",
+    historyClear: "Vider l'historique",
+    gpuRestartNeeded: "Le changement d'accélération GPU nécessite un redémarrage de l'application."
+  },
+  en: {
+    setupTitle: "Initializing...",
+    setupLabel: "Preparing environment",
+    mainTitle: "What do you want to download?",
+    linkPlaceholder: "YouTube link...",
+    pasteBtn: "Paste",
+    invalidLink: "Invalid link",
+    modeVideo: "Video",
+    modeAudio: "Audio",
+    downloadBtn: "Download",
+    downloading: "Downloading...",
+    cancelBtn: "Cancel",
+    speedCalc: "Calculating...",
+    settingsTitle: "Settings",
+    backBtn: "Back",
+    emptyUrlError: "Please enter a URL.",
+    invalidUrlError: "Please enter a valid YouTube URL.",
+    notReadyError: "Required components are not ready yet. Please wait...",
+    downloadCancelLog: "Download canceled.",
+    downloadSuccessLog: "Download complete!",
+    openFolderLog: "Open folder",
+    unknownError: "Unknown error",
+    importSuccess: "Configuration imported successfully!",
+    exportSuccess: "Configuration exported successfully!",
+    resetConfirm: "Are you sure you want to reset the configuration?",
+    queueTitle: "Download Queue",
+    queueEmpty: "No downloads in progress",
+    queueActive: "Downloading",
+    queueWaiting: "Waiting",
+    queueDone: "Done",
+    queueError: "Error",
+    queueCancelled: "Canceled",
+    queueSomeErrors: "Some downloads failed.",
+    queueSomeCancelled: "Downloads finished, some were canceled.",
+    queueClear: "clear",
+    tabGeneral: "General",
+    tabAppearance: "Appearance",
+    tabVideo: "Video",
+    tabAudio: "Audio",
+    tabAdvanced: "Advanced",
+    tabHistory: "History",
+    lblDownloadFolder: "Download folder",
+    descDownloadFolder: "Where the downloaded files will be saved.",
+    btnModify: "Modify",
+    lblTheme: "Dark mode",
+    descTheme: "Toggle between light and dark themes.",
+    lblCustomTheme: "Themes",
+    descCustomTheme: "Choose a skin loaded from the assets/themes folder.",
+    themeDefaultName: "No theme",
+    themeDefaultDesc: "Uses only the built-in light or dark mode.",
+    themeEmpty: "No custom theme detected yet.",
+    themeFolderHint: "Create a folder in assets/themes/NAME with theme.css, background.png, icon.png, and optionally banner.png plus font.ttf or font.otf.",
+    lblLanguage: "Language",
+    lblAnimations: "Animations",
+    lblVideoQuality: "Video quality",
+    descVideoQuality: "If preferred video quality isn't available, next best is picked instead.",
+    lblVideoCodec: "Preferred video codec",
+    descVideoCodec: "H264: best compatibility. max 1080p.\nAV1: better quality per size. supports 4k/8k HDR.\nVP9: supports 4k HDR.\n\nAV1 and VP9 are not supported everywhere, you may need an additional player or codec pack.",
+    lblVideoContainer: "Video container",
+    descVideoContainer: "When \"auto\" is selected, the most suitable container is chosen from the selected codec.",
+    lblAudioFormat: "Audio format",
+    lblAudioBitrate: "Audio bitrate",
+    lblEmbedThumbnail: "Embed thumbnail",
+    descEmbedThumbnail: "Embeds the YouTube thumbnail as cover art in the audio file.",
+    lblAudioTrack: "Audio track",
+    lblWriteSubs: "Subtitles",
+    descWriteSubs: "Download subtitles if available.",
+    lblSubsLang: "Subtitle language",
+    lblSponsorblock: "SponsorBlock",
+    descSponsorblock: "Marks sponsored segments in the video player progress bar.",
+    optSponsorblockNone: "Disabled",
+    optSponsorblockAll: "Mark all",
+    lblDisableGpu: "Disable GPU acceleration",
+    descDisableGpu: "Enable if the app crashes on startup. Requires a restart.",
+    lblConfig: "Configuration data",
+    descConfig: "Import or export your preferences in JSON format.",
+    btnImport: "Import",
+    btnExport: "Export",
+    btnReset: "Reset",
+    lblDebug: "debug",
+    lblDevTools: "Developer tools",
+    descDevTools: "enable the F12 key to open the DevTools console.",
+    lblVerbose: "Verbose mode",
+    descVerbose: "adds -v to yt-dlp commands for detailed logging.",
+    lblYtdlpVersion: "yt-dlp version:",
+    btnUpdateBinaries: "Update",
+    lblLogConsole: "log console",
+    descLogConsole: "real-time yt-dlp output.",
+    btnClearLog: "Clear",
+    btnCopyCmd: "Copy command",
+    logEmpty: "Waiting...",
+    pvQuality: "Quality",
+    pvCodec: "Codec",
+    pvContainer: "Format",
+    pvAudioFormat: "Format",
+    pvBitrate: "Bitrate",
+    pvDefault: "Default",
+    optAuto: "Auto",
+    optDefault: "Default",
+    optEnabled: "Enabled",
+    optMinimal: "Minimal",
+    optDisabled: "Disabled",
+    optBest: "Best",
+    optNone: "None",
+    historyTitle: "History",
+    historyEmpty: "No downloads in history.",
+    historyClear: "Clear history",
+    gpuRestartNeeded: "Changing GPU acceleration requires an application restart."
+  }
+};
+
+let currentLang = 'fr';
+
+function t(key) {
+  return translations[currentLang]?.[key] || translations.en?.[key] || key;
+}
+
+function applyLanguage(langSetting) {
+  let lang = langSetting;
+  if (lang === 'auto') {
+    lang = navigator.language.startsWith('fr') ? 'fr' : 'en';
+  }
+  if (!translations[lang]) lang = 'en';
+  currentLang = lang;
+  const tr = translations[lang];
+
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (tr[key]) el.innerHTML = tr[key].replace(/\n/g, '<br>');
+  });
+
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    if (tr[key]) el.setAttribute('title', tr[key]);
+  });
+
+  const urlInp = document.getElementById('url-input');
+  if (urlInp) urlInp.setAttribute('placeholder', tr.linkPlaceholder);
+
+  renderThemeCards();
+}
+
+// ─── URL & Validation ──────────────────────────────────
 function isValidYouTubeUrl(url) {
   const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?|shorts\/|embed\/|v\/|playlist\?)|youtu\.be\/|music\.youtube\.com\/watch\?)/;
   return pattern.test(url.trim());
 }
 
-function getSettingKey(id) {
-  return id.replace('setting-', '').replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+function showError(msg) {
+  urlInput.classList.add('error');
+  urlError.textContent = msg;
+  urlError.classList.remove('hidden');
 }
 
+function hideError() {
+  urlInput.classList.remove('error');
+  urlError.classList.add('hidden');
+}
+
+function showStatus(msg, type) {
+  statusMessage.textContent = msg;
+  statusMessage.className = 'status-message ' + (type || 'success');
+  statusSection.classList.remove('hidden');
+}
+
+function hideStatus() {
+  statusSection.classList.add('hidden');
+  statusMessage.textContent = '';
+  statusMessage.className = 'status-message';
+}
+
+function showLocalizedStatus(key, type = 'success') {
+  showStatus(t(key), type);
+}
+
+// ─── Formatting ───────────────────────────────────────
+function formatDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return 'Taille inconnue';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// ─── Preview ──────────────────────────────────────────
+async function updatePreview() {
+  const url = urlInput.value.trim();
+  if (!url || !isValidYouTubeUrl(url)) {
+    videoPreview.classList.add('hidden');
+    currentPreviewInfo = null;
+    return;
+  }
+
+  const info = await window.api.getVideoInfo(url);
+  if (info && urlInput.value.trim() === url) {
+    currentPreviewInfo = info;
+    previewThumbnail.src = info.thumbnail || '';
+    if (info.isPlaylist) {
+      previewTitle.innerHTML = `<span class="badge" style="background: var(--accent); color: var(--accent-text); padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 6px; vertical-align: middle; font-weight: bold; text-transform: uppercase;">Playlist</span>` + (info.title || 'Inconnu');
+      previewDuration.textContent = `${info.videoCount} vidéos`;
+      previewSize.textContent = 'Playlist';
+    } else {
+      previewTitle.textContent = info.title || 'Inconnu';
+      previewDuration.textContent = formatDuration(info.duration);
+      previewSize.textContent = formatBytes(info.size);
+    }
+    previewTitle.title = info.title;
+    previewChannel.textContent = info.channel || '';
+    videoPreview.classList.remove('hidden');
+  } else if (!info) {
+    currentPreviewInfo = null;
+    videoPreview.classList.add('hidden');
+  }
+}
+
+// ─── Themes ───────────────────────────────────────────
 function getThemeById(themeId) {
   return availableThemes.find((theme) => theme.id === themeId) || null;
 }
@@ -95,9 +425,7 @@ function escapeFontFamily(value) {
 }
 
 function applyCustomThemeFont(theme) {
-  if (!customThemeFontStyle) {
-    return;
-  }
+  if (!customThemeFontStyle) return;
 
   if (!theme || !theme.fontPath || !theme.fontFormat) {
     customThemeFontStyle.textContent = '';
@@ -126,8 +454,7 @@ function applyCustomPhrase(theme) {
     const index = Math.floor(Math.random() * theme.customPhrases.length);
     mainTitle.textContent = theme.customPhrases[index];
   } else {
-    const t = translations[currentLang] || translations.fr;
-    mainTitle.textContent = t.mainTitle;
+    mainTitle.textContent = t('mainTitle');
   }
 }
 
@@ -137,9 +464,7 @@ function getEffectiveThemeMode(themeMode = preferredThemeMode) {
 
 function updateThemeToggleState() {
   const toggle = document.getElementById('setting-theme-toggle');
-  if (!toggle) {
-    return;
-  }
+  if (!toggle) return;
 
   const customThemeActive = selectedCustomThemeId !== 'default';
   toggle.disabled = customThemeActive;
@@ -223,17 +548,14 @@ function createThemeCard(theme) {
 }
 
 function renderThemeCards() {
-  if (!themeGrid) {
-    return;
-  }
+  if (!themeGrid) return;
 
-  const t = translations[currentLang];
   themeGrid.innerHTML = '';
 
   themeGrid.appendChild(createThemeCard({
     id: 'default',
-    label: t.themeDefaultName,
-    meta: t.themeDefaultDesc,
+    label: t('themeDefaultName'),
+    meta: t('themeDefaultDesc'),
     bannerPath: null,
     backgroundPath: null,
     iconPath: null
@@ -261,46 +583,53 @@ async function refreshThemes(selectedThemeId) {
   }
 }
 
-function showError(msg) {
-  urlInput.classList.add('error');
-  urlError.textContent = msg;
-  urlError.classList.remove('hidden');
+function setTheme(theme, { persist = true } = {}) {
+  preferredThemeMode = theme;
+  syncThemeMode({ persist });
 }
 
-function hideError() {
-  urlInput.classList.remove('error');
-  urlError.classList.add('hidden');
+function applyAnimations(animSetting) {
+  if (animSetting === 'disabled') {
+    document.documentElement.style.setProperty('--transition', 'none');
+    document.documentElement.style.setProperty('--slide-transition', 'none');
+  } else if (animSetting === 'minimal') {
+    document.documentElement.style.setProperty('--transition', '0.1s ease');
+    document.documentElement.style.setProperty('--slide-transition', '0.2s ease');
+  } else {
+    document.documentElement.style.setProperty('--transition', '0.25s cubic-bezier(0.25, 0.1, 0.25, 1)');
+    document.documentElement.style.setProperty('--slide-transition', '0.4s cubic-bezier(0.25, 1, 0.5, 1)');
+  }
 }
 
-function showStatus(msg, type) {
-  statusMessage.textContent = msg;
-  statusMessage.className = 'status-message ' + (type || 'success');
-  statusSection.classList.remove('hidden');
-}
-
-function hideStatus() {
-  statusSection.classList.add('hidden');
-  statusMessage.textContent = '';
-  statusMessage.className = 'status-message';
-}
-
+// ─── Queue ────────────────────────────────────────────
 function setQueuePanelVisibility(visible) {
   queuePanel.classList.toggle('hidden', !visible);
 }
 
-function setScreen(screen) {
-  const showSettings = screen === 'settings';
-
-  screenMain.classList.toggle('active', !showSettings);
-  screenMain.classList.toggle('left', showSettings);
-  screenSettings.classList.toggle('active', showSettings);
-  screenSettings.classList.toggle('right', !showSettings);
-  openSettings.style.display = showSettings ? 'none' : '';
-  openQueueBtn.style.display = showSettings ? 'none' : '';
-
-  if (showSettings) {
-    setQueuePanelVisibility(false);
+function setDownloadingState(isDown) {
+  isDownloading = isDown;
+  if (isDown) {
+    cancelBtn.classList.remove('hidden');
+    downloadBtn.classList.add('hidden');
+  } else {
+    cancelBtn.classList.add('hidden');
+    downloadBtn.classList.remove('hidden');
   }
+}
+
+function updateQueueBadge() {
+  const activeCount = queue.filter(i => i.status === 'waiting' || i.status === 'active').length;
+  if (activeCount > 0) {
+    queueBadge.textContent = activeCount;
+    queueBadge.classList.remove('hidden');
+  } else {
+    queueBadge.classList.add('hidden');
+  }
+}
+
+function updateQueueRing(percent) {
+  const offset = RING_CIRCUMFERENCE - (percent / 100) * RING_CIRCUMFERENCE;
+  queueRingProgress.style.strokeDashoffset = offset;
 }
 
 function getQueueDetailParts(item) {
@@ -322,36 +651,7 @@ function getQueueResultDetail(item) {
   return item.reason || item.error || '';
 }
 
-function setDownloadingState(isDown) {
-  isDownloading = isDown;
-  if (isDown) {
-    cancelBtn.classList.remove('hidden');
-    downloadBtn.classList.add('hidden');
-  } else {
-    cancelBtn.classList.add('hidden');
-    downloadBtn.classList.remove('hidden');
-  }
-}
-
-const RING_CIRCUMFERENCE = 2 * Math.PI * 18;
-
-function updateQueueBadge() {
-  const activeCount = queue.filter(i => i.status === 'waiting' || i.status === 'active').length;
-  if (activeCount > 0) {
-    queueBadge.textContent = activeCount;
-    queueBadge.classList.remove('hidden');
-  } else {
-    queueBadge.classList.add('hidden');
-  }
-}
-
-function updateQueueRing(percent) {
-  const offset = RING_CIRCUMFERENCE - (percent / 100) * RING_CIRCUMFERENCE;
-  queueRingProgress.style.strokeDashoffset = offset;
-}
-
 function renderQueue() {
-  const t = translations[currentLang];
   queueList.innerHTML = '';
 
   const visibleItems = queue.filter(i => i.status !== 'removed');
@@ -359,7 +659,7 @@ function renderQueue() {
   if (visibleItems.length === 0) {
     const emptyP = document.createElement('p');
     emptyP.className = 'queue-empty';
-    emptyP.textContent = t.queueEmpty;
+    emptyP.textContent = t('queueEmpty');
     queueList.appendChild(emptyP);
     updateQueueBadge();
     return;
@@ -393,18 +693,18 @@ function renderQueue() {
     status.className = 'queue-item-status';
     if (item.status === 'active') {
       status.classList.add('active');
-      status.textContent = t.queueActive;
+      status.textContent = t('queueActive');
     } else if (item.status === 'waiting') {
-      status.textContent = t.queueWaiting;
+      status.textContent = t('queueWaiting');
     } else if (item.status === 'done') {
       status.classList.add('done');
-      status.textContent = t.queueDone;
+      status.textContent = t('queueDone');
     } else if (item.status === 'error') {
       status.classList.add('error');
-      status.textContent = t.queueError;
+      status.textContent = t('queueError');
     } else if (item.status === 'cancelled') {
       status.classList.add('cancelled');
-      status.textContent = t.queueCancelled;
+      status.textContent = t('queueCancelled');
     }
     header.appendChild(status);
 
@@ -498,7 +798,6 @@ async function processQueue() {
   processingQueue = false;
   updateQueueRing(0);
 
-  const t = translations[currentLang];
   const completed = queue.filter(i => i.status === 'done' || i.status === 'error' || i.status === 'cancelled');
   if (completed.length > 0) {
     const errCount = queue.filter(i => i.status === 'error').length;
@@ -506,105 +805,24 @@ async function processQueue() {
     const doneCount = queue.filter(i => i.status === 'done').length;
 
     if (errCount === 0 && cancelledCount === 0) {
-      showStatus(t.downloadSuccessLog, 'success');
+      showStatus(t('downloadSuccessLog'), 'success');
     } else if (errCount > 0) {
-      showStatus(t.queueSomeErrors, 'error');
+      showStatus(t('queueSomeErrors'), 'error');
     } else if (doneCount > 0) {
-      showStatus(t.queueSomeCancelled, 'cancelled');
+      showStatus(t('queueSomeCancelled'), 'cancelled');
     }
   }
   updateQueueBadge();
 }
 
-pasteBtn.addEventListener('click', async () => {
-  try {
-    const text = await navigator.clipboard.readText();
-    urlInput.value = text;
-    urlInput.focus();
-    hideError();
-    clearTimeout(previewDebounce);
-    previewDebounce = setTimeout(updatePreview, 100);
-  } catch {}
-});
-
-urlInput.addEventListener('input', () => {
-  clearTimeout(previewDebounce);
-  videoPreview.classList.add('hidden');
-  previewDebounce = setTimeout(updatePreview, 200);
-});
-
-function formatDuration(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-function formatBytes(bytes) {
-  if (!bytes || bytes === 0) return 'Taille inconnue';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-let currentPreviewInfo = null;
-
-async function updatePreview() {
-  const url = urlInput.value.trim();
-  if (!url || !isValidYouTubeUrl(url)) {
-    videoPreview.classList.add('hidden');
-    currentPreviewInfo = null;
-    return;
-  }
-  
-  const info = await window.api.getVideoInfo(url);
-  if (info && urlInput.value.trim() === url) {
-    currentPreviewInfo = info;
-    previewThumbnail.src = info.thumbnail || '';
-    if (info.isPlaylist) {
-      previewTitle.innerHTML = `<span class="badge" style="background: var(--accent); color: var(--accent-text); padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 6px; vertical-align: middle; font-weight: bold; text-transform: uppercase;">Playlist</span>` + (info.title || 'Inconnu');
-      previewDuration.textContent = `${info.videoCount} vidéos`;
-      previewSize.textContent = 'Playlist';
-    } else {
-      previewTitle.textContent = info.title || 'Inconnu';
-      previewDuration.textContent = formatDuration(info.duration);
-      previewSize.textContent = formatBytes(info.size);
-    }
-    previewTitle.title = info.title;
-    previewChannel.textContent = info.channel || '';
-    videoPreview.classList.remove('hidden');
-  } else if (!info) {
-    currentPreviewInfo = null;
-    videoPreview.classList.add('hidden');
-  }
-}
-
-modeVideo.addEventListener('click', () => setMode('video'));
-modeAudio.addEventListener('click', () => setMode('audio'));
-
+// ─── Download ─────────────────────────────────────────
 function setMode(mode) {
   currentMode = mode;
   modeVideo.classList.toggle('active', mode === 'video');
   modeAudio.classList.toggle('active', mode === 'audio');
-  // Sync per-video panels
   if (pvVideoOpts) pvVideoOpts.classList.toggle('hidden', mode !== 'video');
   if (pvAudioOpts) pvAudioOpts.classList.toggle('hidden', mode !== 'audio');
 }
-
-if (perVideoToggle) {
-  perVideoToggle.addEventListener('click', () => {
-    perVideoVisible = !perVideoVisible;
-    perVideoSettings.classList.toggle('hidden', !perVideoVisible);
-    perVideoToggle.classList.toggle('active', perVideoVisible);
-  });
-}
-
-downloadBtn.addEventListener('click', startDownload);
-urlInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') startDownload();
-});
 
 async function startDownload() {
   try {
@@ -612,19 +830,17 @@ async function startDownload() {
     hideStatus();
 
     const url = urlInput.value.trim();
-    const t = translations[currentLang];
 
-    if (!url) { showError(t.emptyUrlError); return; }
-    if (!isValidYouTubeUrl(url)) { showError(t.invalidUrlError); return; }
+    if (!url) { showError(t('emptyUrlError')); return; }
+    if (!isValidYouTubeUrl(url)) { showError(t('invalidUrlError')); return; }
 
     const ready = await window.api.checkBinaries();
-    if (!ready) { showError(t.notReadyError); return; }
+    if (!ready) { showError(t('notReadyError')); return; }
 
     const id = ++queueIdCounter;
     const isPlaylist = currentPreviewInfo && currentPreviewInfo.isPlaylist;
     const playlistTitle = isPlaylist ? currentPreviewInfo.title : null;
 
-    // Collect per-video overrides (empty string = use global default)
     const pvSettings = {
       videoQuality: pvQuality ? pvQuality.value : '',
       videoCodec: pvCodec ? pvCodec.value : '',
@@ -663,13 +879,225 @@ async function startDownload() {
   }
 }
 
+// ─── Debug Log ────────────────────────────────────────
+function appendLog(text, isError) {
+  if (!logConsole) return;
+  const placeholder = logConsole.querySelector('.log-placeholder');
+  if (placeholder) placeholder.remove();
+
+  logLines.push({ text, isError });
+  if (logLines.length > MAX_LOG_LINES) logLines.shift();
+
+  const span = document.createElement('span');
+  span.className = isError ? 'log-line-err' : '';
+  span.textContent = text + '\n';
+  logConsole.appendChild(span);
+  logConsole.scrollTop = logConsole.scrollHeight;
+}
+
+// ─── History ──────────────────────────────────────────
+async function loadHistoryUI() {
+  const historyList = document.getElementById('history-list');
+  if (!historyList) return;
+
+  const history = await window.api.getHistory();
+  historyList.innerHTML = '';
+
+  if (history.length === 0) {
+    const emptyP = document.createElement('p');
+    emptyP.className = 'queue-empty';
+    emptyP.textContent = t('historyEmpty');
+    historyList.appendChild(emptyP);
+    return;
+  }
+
+  for (const item of history) {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+
+    const header = document.createElement('div');
+    header.className = 'history-item-header';
+
+    const icon = document.createElement('span');
+    icon.className = 'queue-item-icon';
+    icon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+    header.appendChild(icon);
+
+    const title = document.createElement('span');
+    title.className = 'queue-item-title';
+    title.textContent = item.title || item.url;
+    header.appendChild(title);
+
+    const mode = document.createElement('span');
+    mode.className = 'queue-item-status done';
+    mode.textContent = item.mode === 'video' ? 'Vidéo' : 'Audio';
+    header.appendChild(mode);
+
+    div.appendChild(header);
+
+    const detail = document.createElement('div');
+    detail.className = 'queue-item-detail';
+    const date = new Date(item.timestamp);
+    detail.textContent = date.toLocaleString();
+    div.appendChild(detail);
+
+    if (item.folder) {
+      const openBtn = document.createElement('button');
+      openBtn.className = 'btn btn-secondary btn-small-mono';
+      openBtn.style.marginTop = '4px';
+      openBtn.textContent = t('openFolderLog');
+      openBtn.addEventListener('click', () => {
+        window.api.openFolder(item.folder);
+      });
+      div.appendChild(openBtn);
+    }
+
+    historyList.appendChild(div);
+  }
+}
+
+// ─── Screen Navigation ────────────────────────────────
+function setScreen(screen) {
+  const showSettings = screen === 'settings';
+
+  screenMain.classList.toggle('active', !showSettings);
+  screenMain.classList.toggle('left', showSettings);
+  screenSettings.classList.toggle('active', showSettings);
+  screenSettings.classList.toggle('right', !showSettings);
+  openSettings.style.display = showSettings ? 'none' : '';
+  openQueueBtn.style.display = showSettings ? 'none' : '';
+
+  if (showSettings) {
+    setQueuePanelVisibility(false);
+    loadHistoryUI();
+  }
+}
+
+// ─── Settings ─────────────────────────────────────────
+function getSettingKey(id) {
+  return id.replace('setting-', '').replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+}
+
+function updateSegmentedControl(id, value) {
+  const group = document.getElementById(id);
+  if (!group) return;
+  group.querySelectorAll('.modern-segment').forEach(s => {
+    s.classList.toggle('active', s.getAttribute('data-val') === value);
+  });
+}
+
+async function applySettingsToUI(settings) {
+  folderPath.textContent = settings.downloadFolder || '~/Téléchargements';
+  preferredThemeMode = settings.theme || 'dark';
+  syncThemeMode();
+  applyAnimations(settings.animations || 'enabled');
+  applyLanguage(settings.language || 'auto');
+
+  SETTINGS_GROUP_IDS.forEach(id => {
+    const key = getSettingKey(id);
+    if (settings[key] !== undefined) updateSegmentedControl(id, settings[key]);
+  });
+  await refreshThemes(settings.customTheme || 'default');
+
+  const devToolsToggle = document.getElementById('setting-dev-tools');
+  if (devToolsToggle) devToolsToggle.checked = settings.devTools || false;
+
+  const verboseToggle = document.getElementById('setting-verbose');
+  if (verboseToggle) verboseToggle.checked = settings.verboseMode || false;
+  verboseModeEnabled = settings.verboseMode || false;
+
+  const embedThumbnailToggle = document.getElementById('setting-embed-thumbnail');
+  if (embedThumbnailToggle) embedThumbnailToggle.checked = settings.embedThumbnail !== false;
+
+  const writeSubsToggle = document.getElementById('setting-write-subs');
+  if (writeSubsToggle) writeSubsToggle.checked = settings.writeSubs || false;
+
+  const disableGpuToggle = document.getElementById('setting-disable-gpu');
+  if (disableGpuToggle) disableGpuToggle.checked = settings.disableGpu || false;
+
+  window.api.getYtdlpVersion().then((ver) => {
+    const vEl = document.getElementById('ytdlp-version-display');
+    if (vEl) vEl.textContent = ver || '\u2014';
+  });
+}
+
+// ─── Event Listeners ──────────────────────────────────
+pasteBtn.addEventListener('click', async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    urlInput.value = text;
+    urlInput.focus();
+    hideError();
+    clearTimeout(previewDebounce);
+    previewDebounce = setTimeout(updatePreview, 100);
+  } catch {}
+});
+
+urlInput.addEventListener('input', () => {
+  clearTimeout(previewDebounce);
+  videoPreview.classList.add('hidden');
+  previewDebounce = setTimeout(updatePreview, 200);
+});
+
+urlInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') startDownload();
+});
+
+urlInput.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+});
+
+urlInput.addEventListener('drop', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  const text = e.dataTransfer.getData('text') || e.dataTransfer.getData('text/plain');
+  if (text) {
+    urlInput.value = text;
+    urlInput.focus();
+    hideError();
+    clearTimeout(previewDebounce);
+    previewDebounce = setTimeout(updatePreview, 100);
+  }
+});
+
+document.addEventListener('paste', (e) => {
+  if (document.activeElement !== urlInput) {
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (text && /^https?:\/\//.test(text.trim())) {
+      urlInput.value = text;
+      urlInput.focus();
+      e.preventDefault();
+      hideError();
+      clearTimeout(previewDebounce);
+      previewDebounce = setTimeout(updatePreview, 100);
+    }
+  }
+});
+
+modeVideo.addEventListener('click', () => setMode('video'));
+modeAudio.addEventListener('click', () => setMode('audio'));
+
+if (perVideoToggle) {
+  perVideoToggle.addEventListener('click', () => {
+    perVideoVisible = !perVideoVisible;
+    perVideoSettings.classList.toggle('hidden', !perVideoVisible);
+    perVideoToggle.classList.toggle('active', perVideoVisible);
+  });
+}
+
+downloadBtn.addEventListener('click', startDownload);
+
 cancelBtn.addEventListener('click', async () => {
   await window.api.cancelDownload();
-  showStatus(translations[currentLang].downloadCancelLog, 'cancelled');
+  showStatus(t('downloadCancelLog'), 'cancelled');
 });
 
 window.api.onProgress((data) => {
   updateQueueRing(data.percent || 0);
+
+  const mainProgressContainer = document.getElementById('main-progress-bar-container');
+  if (mainProgressContainer) mainProgressContainer.classList.remove('hidden');
 
   const active = queue.find(i => i.status === 'active');
   if (active) {
@@ -688,10 +1116,24 @@ window.api.onProgress((data) => {
       }
     }
   }
+
+  const mainProgressBar = document.getElementById('main-progress-bar');
+  if (mainProgressBar) mainProgressBar.style.width = (data.percent || 0) + '%';
 });
 
-window.api.onComplete(() => {});
-window.api.onFailed(() => {});
+window.api.onComplete(() => {
+  const mainProgressBar = document.getElementById('main-progress-bar');
+  const mainProgressContainer = document.getElementById('main-progress-bar-container');
+  if (mainProgressBar) mainProgressBar.style.width = '0%';
+  if (mainProgressContainer) mainProgressContainer.classList.add('hidden');
+});
+
+window.api.onFailed(() => {
+  const mainProgressBar = document.getElementById('main-progress-bar');
+  const mainProgressContainer = document.getElementById('main-progress-bar-container');
+  if (mainProgressBar) mainProgressBar.style.width = '0%';
+  if (mainProgressContainer) mainProgressContainer.classList.add('hidden');
+});
 
 window.api.onSetupProgress((data) => {
   setupOverlay.classList.remove('hidden');
@@ -708,23 +1150,9 @@ window.api.onSetupError((msg) => {
   setupProgressBar.style.width = '0%';
 });
 
-// ─── Debug: log console ────────────────────────────────
-const MAX_LOG_LINES = 500;
-
-function appendLog(text, isError) {
-  if (!logConsole) return;
-  const placeholder = logConsole.querySelector('.log-placeholder');
-  if (placeholder) placeholder.remove();
-
-  logLines.push({ text, isError });
-  if (logLines.length > MAX_LOG_LINES) logLines.shift();
-
-  const span = document.createElement('span');
-  span.className = isError ? 'log-line-err' : '';
-  span.textContent = text + '\n';
-  logConsole.appendChild(span);
-  logConsole.scrollTop = logConsole.scrollHeight;
-}
+window.api.onGpuRestartNeeded?.(() => {
+  showStatus(t('gpuRestartNeeded'), 'warning');
+});
 
 window.api.onDownloadLog((data) => {
   appendLog(data.text, data.isError);
@@ -733,13 +1161,13 @@ window.api.onDownloadLog((data) => {
 window.api.onDownloadStarted((data) => {
   if (data && data.command) {
     lastCommand = data.command;
-    appendLog('▶ ' + data.command, false);
+    appendLog('\u25B6 ' + data.command, false);
   }
 });
 
 document.getElementById('clear-log')?.addEventListener('click', () => {
   if (!logConsole) return;
-  logConsole.innerHTML = '<span class="log-placeholder" data-i18n="logEmpty">En attente...</span>';
+  logConsole.innerHTML = '<span class="log-placeholder" data-i18n="logEmpty">' + t('logEmpty') + '</span>';
   logLines = [];
 });
 
@@ -756,10 +1184,9 @@ document.getElementById('update-binaries')?.addEventListener('click', async () =
   const ok = await window.api.updateBinaries();
   appendLog(ok ? 'Binaires mis à jour avec succès.' : 'Échec de la mise à jour.', !ok);
   if (btn) btn.disabled = false;
-  // Refresh version display
   const ver = await window.api.getYtdlpVersion();
   const vEl = document.getElementById('ytdlp-version-display');
-  if (vEl) vEl.textContent = ver || '—';
+  if (vEl) vEl.textContent = ver || '\u2014';
 });
 
 const verboseToggle = document.getElementById('setting-verbose');
@@ -787,13 +1214,8 @@ document.addEventListener('click', (e) => {
   }
 });
 
-openSettings.addEventListener('click', () => {
-  setScreen('settings');
-});
-
-closeSettings.addEventListener('click', () => {
-  setScreen('main');
-});
+openSettings.addEventListener('click', () => setScreen('settings'));
+closeSettings.addEventListener('click', () => setScreen('main'));
 
 changeFolder.addEventListener('click', async () => {
   const selected = await window.api.selectFolder();
@@ -802,10 +1224,6 @@ changeFolder.addEventListener('click', async () => {
     await window.api.saveSettings({ downloadFolder: selected });
   }
 });
-
-function showLocalizedStatus(key, type = 'success') {
-  showStatus(translations[currentLang][key], type);
-}
 
 document.getElementById('import-config').addEventListener('click', async () => {
   const newConfig = await window.api.importConfig();
@@ -817,13 +1235,11 @@ document.getElementById('import-config').addEventListener('click', async () => {
 
 document.getElementById('export-config').addEventListener('click', async () => {
   const success = await window.api.exportConfig();
-  if (success) {
-    showLocalizedStatus('exportSuccess');
-  }
+  if (success) showLocalizedStatus('exportSuccess');
 });
 
 document.getElementById('reset-config').addEventListener('click', async () => {
-  if (confirm(translations[currentLang].resetConfirm)) {
+  if (confirm(t('resetConfirm'))) {
     const defaultSettings = await window.api.resetConfig();
     await applySettingsToUI(defaultSettings);
     hideError();
@@ -831,288 +1247,10 @@ document.getElementById('reset-config').addEventListener('click', async () => {
   }
 });
 
-const translations = {
-  fr: {
-    setupTitle: "Initialisation...",
-    setupLabel: "Préparation de l'environnement",
-    mainTitle: "Que souhaitez-vous télécharger ?",
-    linkPlaceholder: "Lien YouTube...",
-    pasteBtn: "Coller",
-    invalidLink: "Lien invalide",
-    modeVideo: "Vidéo",
-    modeAudio: "Audio",
-    downloadBtn: "Télécharger",
-    downloading: "Téléchargement...",
-    cancelBtn: "Annuler",
-    speedCalc: "Calcul...",
-    settingsTitle: "Paramètres",
-    backBtn: "Retour",
-    emptyUrlError: "Veuillez entrer une URL.",
-    invalidUrlError: "Veuillez entrer une URL YouTube valide.",
-    notReadyError: "Les composants ne sont pas encore prêts. Patientez...",
-    downloadCancelLog: "Téléchargement annulé.",
-    downloadSuccessLog: "Téléchargement terminé !",
-    openFolderLog: "Ouvrir le dossier",
-    unknownError: "Erreur inconnue",
-    importSuccess: "Configuration importée avec succès !",
-    exportSuccess: "Configuration exportée avec succès !",
-    resetConfirm: "Voulez-vous vraiment réinitialiser la configuration ?",
-    queueTitle: "File d'attente",
-    queueEmpty: "Aucun téléchargement en cours",
-    queueActive: "En cours",
-    queueWaiting: "En attente",
-    queueDone: "Terminé",
-    queueError: "Erreur",
-    queueCancelled: "Annulé",
-    queueSomeErrors: "Certains téléchargements ont échoué.",
-    queueSomeCancelled: "Téléchargements terminés, certains ont été annulés.",
-    queueClear: "vider",
-    tabGeneral: "Général",
-    tabAppearance: "Apparence",
-    tabVideo: "Vidéo",
-    tabAudio: "Audio",
-    tabAdvanced: "Avancé",
-    lblDownloadFolder: "Dossier de destination",
-    descDownloadFolder: "L'emplacement où les fichiers seront sauvegardés.",
-    btnModify: "Modifier",
-    lblTheme: "Mode sombre",
-    descTheme: "Bascule entre les thèmes clair et sombre.",
-    lblCustomTheme: "Thèmes",
-    descCustomTheme: "Choisissez un habillage chargé depuis le dossier assets/themes.",
-    themeDefaultName: "Aucun thème",
-    themeDefaultDesc: "Utilise seulement le thème clair ou sombre intégré.",
-    themeEmpty: "Aucun thème détecté pour le moment.",
-    themeFolderHint: "Créez un dossier dans assets/themes/NOM avec theme.css, background.png, icon.png, et éventuellement banner.png et font.ttf ou font.otf.",
-    lblLanguage: "Langue",
-    lblAnimations: "Animations",
-    lblVideoQuality: "Qualité vidéo",
-    descVideoQuality: "Si la qualité préférée n'est pas disponible, la suivante la plus proche sera sélectionnée.",
-    lblVideoCodec: "Codec vidéo préféré",
-    descVideoCodec: "H264 : meilleure compatibilité. max 1080p.\nAV1 : meilleure qualité/taille. supporte 4k/8k HDR.\nVP9 : supporte 4k HDR.\n\nAV1 et VP9 ne sont pas supportés partout, vous pourriez avoir besoin d'un logiciel supplémentaire pour les lire.",
-    lblVideoContainer: "Conteneur vidéo",
-    descVideoContainer: "Quand \"auto\" est sélectionné, le format idéal sera choisi en fonction du codec.",
-    lblAudioFormat: "Format audio",
-    lblAudioBitrate: "Bitrate audio",
-    lblEmbedThumbnail: "Intégrer la miniature",
-    descEmbedThumbnail: "Intègre la miniature YouTube comme pochette dans le fichier audio.",
-    lblAudioTrack: "Piste audio",
-    lblConfig: "Données de configuration",
-    descConfig: "Importer ou exporter vos préférences au format JSON.",
-    btnImport: "Importer",
-    btnExport: "Exporter",
-    btnReset: "Réinitialiser",
-    lblDebug: "debug",
-    lblDevTools: "Outils de développement",
-    descDevTools: "active la touche F12 pour ouvrir la console DevTools.",
-    lblVerbose: "Mode verbose",
-    descVerbose: "ajoute -v aux commandes yt-dlp pour un log détaillé.",
-    lblYtdlpVersion: "version yt-dlp :",
-    btnUpdateBinaries: "Mettre à jour",
-    lblLogConsole: "console de log",
-    descLogConsole: "sortie en temps réel de yt-dlp.",
-    btnClearLog: "Vider",
-    btnCopyCmd: "Copier la commande",
-    logEmpty: "En attente...",
-    pvQuality: "Qualité",
-    pvCodec: "Codec",
-    pvContainer: "Format",
-    pvAudioFormat: "Format",
-    pvBitrate: "Bitrate",
-    pvDefault: "Par défaut",
-    optAuto: "Auto",
-    optDefault: "Par défaut",
-    optEnabled: "Activées",
-    optMinimal: "Minimales",
-    optDisabled: "Désactivées",
-    optBest: "Meilleur"
-  },
-  en: {
-    setupTitle: "Initializing...",
-    setupLabel: "Preparing environment",
-    mainTitle: "What do you want to download?",
-    linkPlaceholder: "YouTube link...",
-    pasteBtn: "Paste",
-    invalidLink: "Invalid link",
-    modeVideo: "Video",
-    modeAudio: "Audio",
-    downloadBtn: "Download",
-    downloading: "Downloading...",
-    cancelBtn: "Cancel",
-    speedCalc: "Calculating...",
-    settingsTitle: "Settings",
-    backBtn: "Back",
-    emptyUrlError: "Please enter a URL.",
-    invalidUrlError: "Please enter a valid YouTube URL.",
-    notReadyError: "Required components are not ready yet. Please wait...",
-    downloadCancelLog: "Download canceled.",
-    downloadSuccessLog: "Download complete!",
-    openFolderLog: "Open folder",
-    unknownError: "Unknown error",
-    importSuccess: "Configuration imported successfully!",
-    exportSuccess: "Configuration exported successfully!",
-    resetConfirm: "Are you sure you want to reset the configuration?",
-    queueTitle: "Download Queue",
-    queueEmpty: "No downloads in progress",
-    queueActive: "Downloading",
-    queueWaiting: "Waiting",
-    queueDone: "Done",
-    queueError: "Error",
-    queueCancelled: "Canceled",
-    queueSomeErrors: "Some downloads failed.",
-    queueSomeCancelled: "Downloads finished, some were canceled.",
-    queueClear: "clear",
-    tabGeneral: "General",
-    tabAppearance: "Appearance",
-    tabVideo: "Video",
-    tabAudio: "Audio",
-    tabAdvanced: "Advanced",
-    lblDownloadFolder: "Download folder",
-    descDownloadFolder: "Where the downloaded files will be saved.",
-    btnModify: "Modify",
-    lblTheme: "Dark mode",
-    descTheme: "Toggle between light and dark themes.",
-    lblCustomTheme: "Themes",
-    descCustomTheme: "Choose a skin loaded from the assets/themes folder.",
-    themeDefaultName: "No theme",
-    themeDefaultDesc: "Uses only the built-in light or dark mode.",
-    themeEmpty: "No custom theme detected yet.",
-    themeFolderHint: "Create a folder in assets/themes/NAME with theme.css, background.png, icon.png, and optionally banner.png plus font.ttf or font.otf.",
-    lblLanguage: "Language",
-    lblAnimations: "Animations",
-    lblVideoQuality: "Video quality",
-    descVideoQuality: "If preferred video quality isn't available, next best is picked instead.",
-    lblVideoCodec: "Preferred video codec",
-    descVideoCodec: "H264: best compatibility. max 1080p.\nAV1: better quality per size. supports 4k/8k HDR.\nVP9: supports 4k HDR.\n\nAV1 and VP9 are not supported everywhere, you may need an additional player or codec pack.",
-    lblVideoContainer: "Video container",
-    descVideoContainer: "When \"auto\" is selected, the most suitable container is chosen from the selected codec.",
-    lblAudioFormat: "Audio format",
-    lblAudioBitrate: "Audio bitrate",
-    lblEmbedThumbnail: "Embed thumbnail",
-    descEmbedThumbnail: "Embeds the YouTube thumbnail as cover art in the audio file.",
-    lblAudioTrack: "Audio track",
-    lblConfig: "Configuration data",
-    descConfig: "Import or export your preferences in JSON format.",
-    btnImport: "Import",
-    btnExport: "Export",
-    btnReset: "Reset",
-    lblDebug: "debug",
-    lblDevTools: "Developer tools",
-    descDevTools: "enable the F12 key to open the DevTools console.",
-    lblVerbose: "Verbose mode",
-    descVerbose: "adds -v to yt-dlp commands for detailed logging.",
-    lblYtdlpVersion: "yt-dlp version:",
-    btnUpdateBinaries: "Update",
-    lblLogConsole: "log console",
-    descLogConsole: "real-time yt-dlp output.",
-    btnClearLog: "Clear",
-    btnCopyCmd: "Copy command",
-    logEmpty: "Waiting...",
-    pvQuality: "Quality",
-    pvCodec: "Codec",
-    pvContainer: "Format",
-    pvAudioFormat: "Format",
-    pvBitrate: "Bitrate",
-    pvDefault: "Default",
-    optAuto: "Auto",
-    optDefault: "Default",
-    optEnabled: "Enabled",
-    optMinimal: "Minimal",
-    optDisabled: "Disabled",
-    optBest: "Best"
-  }
-};
-
-let currentLang = 'fr';
-
-function applyLanguage(langSetting) {
-  let lang = langSetting;
-  if (lang === 'auto') {
-    lang = navigator.language.startsWith('fr') ? 'fr' : 'en';
-  }
-  if (!translations[lang]) lang = 'en';
-  currentLang = lang;
-  const t = translations[lang];
-
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    if (t[key]) el.innerHTML = t[key].replace(/\n/g, '<br>');
-  });
-
-  document.querySelectorAll('[data-i18n-title]').forEach(el => {
-    const key = el.getAttribute('data-i18n-title');
-    if (t[key]) el.setAttribute('title', t[key]);
-  });
-
-  const urlInp = document.getElementById('url-input');
-  if (urlInp) urlInp.setAttribute('placeholder', t.linkPlaceholder);
-
-  renderThemeCards();
-}
-
-document.querySelectorAll('.modern-segmented').forEach(group => {
-  const groupId = group.id;
-  if (!groupId) return;
-  const segments = group.querySelectorAll('.modern-segment');
-  const configKey = getSettingKey(groupId);
-
-  segments.forEach(btn => {
-    btn.addEventListener('click', async () => {
-      segments.forEach(s => s.classList.remove('active'));
-      btn.classList.add('active');
-      const val = btn.getAttribute('data-val');
-      await window.api.saveSettings({ [configKey]: val });
-      if (configKey === 'animations') applyAnimations(val);
-      if (configKey === 'language') applyLanguage(val);
-    });
-  });
+document.getElementById('clear-history')?.addEventListener('click', async () => {
+  await window.api.clearHistory();
+  loadHistoryUI();
 });
-
-function updateSegmentedControl(id, value) {
-  const group = document.getElementById(id);
-  if (!group) return;
-  group.querySelectorAll('.modern-segment').forEach(s => {
-    s.classList.toggle('active', s.getAttribute('data-val') === value);
-  });
-}
-
-document.querySelectorAll('.sidebar-link').forEach(link => {
-  link.addEventListener('click', () => {
-    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-    link.classList.add('active');
-    const tab = link.getAttribute('data-tab');
-    document.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
-    document.getElementById('pane-' + tab).classList.add('active');
-  });
-});
-
-async function applySettingsToUI(settings) {
-  folderPath.textContent = settings.downloadFolder || '~/Téléchargements';
-  preferredThemeMode = settings.theme || 'dark';
-  syncThemeMode();
-  applyAnimations(settings.animations || 'enabled');
-  applyLanguage(settings.language || 'auto');
-
-  SETTINGS_GROUP_IDS.forEach(id => {
-    const key = getSettingKey(id);
-    if (settings[key] !== undefined) updateSegmentedControl(id, settings[key]);
-  });
-  await refreshThemes(settings.customTheme || 'default');
-
-  const devToolsToggle = document.getElementById('setting-dev-tools');
-  if (devToolsToggle) devToolsToggle.checked = settings.devTools || false;
-
-  if (verboseToggle) verboseToggle.checked = settings.verboseMode || false;
-  verboseModeEnabled = settings.verboseMode || false;
-
-  const embedThumbnailToggle = document.getElementById('setting-embed-thumbnail');
-  if (embedThumbnailToggle) embedThumbnailToggle.checked = settings.embedThumbnail !== false;
-
-  // Fetch and display yt-dlp version
-  window.api.getYtdlpVersion().then((ver) => {
-    const vEl = document.getElementById('ytdlp-version-display');
-    if (vEl) vEl.textContent = ver || '—';
-  });
-}
 
 const themeToggle = document.getElementById('setting-theme-toggle');
 if (themeToggle) {
@@ -1135,24 +1273,49 @@ if (embedThumbnailToggle) {
   });
 }
 
-function setTheme(theme, { persist = true } = {}) {
-  preferredThemeMode = theme;
-  syncThemeMode({ persist });
+const writeSubsToggle = document.getElementById('setting-write-subs');
+if (writeSubsToggle) {
+  writeSubsToggle.addEventListener('change', (e) => {
+    window.api.saveSettings({ writeSubs: e.target.checked });
+  });
 }
 
-function applyAnimations(animSetting) {
-  if (animSetting === 'disabled') {
-    document.documentElement.style.setProperty('--transition', 'none');
-    document.documentElement.style.setProperty('--slide-transition', 'none');
-  } else if (animSetting === 'minimal') {
-    document.documentElement.style.setProperty('--transition', '0.1s ease');
-    document.documentElement.style.setProperty('--slide-transition', '0.2s ease');
-  } else {
-    document.documentElement.style.setProperty('--transition', '0.25s cubic-bezier(0.25, 0.1, 0.25, 1)');
-    document.documentElement.style.setProperty('--slide-transition', '0.4s cubic-bezier(0.25, 1, 0.5, 1)');
-  }
+const disableGpuToggle = document.getElementById('setting-disable-gpu');
+if (disableGpuToggle) {
+  disableGpuToggle.addEventListener('change', (e) => {
+    window.api.saveSettings({ disableGpu: e.target.checked });
+  });
 }
 
+document.querySelectorAll('.modern-segmented').forEach(group => {
+  const groupId = group.id;
+  if (!groupId) return;
+  const segments = group.querySelectorAll('.modern-segment');
+  const configKey = getSettingKey(groupId);
+
+  segments.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      segments.forEach(s => s.classList.remove('active'));
+      btn.classList.add('active');
+      const val = btn.getAttribute('data-val');
+      await window.api.saveSettings({ [configKey]: val });
+      if (configKey === 'animations') applyAnimations(val);
+      if (configKey === 'language') applyLanguage(val);
+    });
+  });
+});
+
+document.querySelectorAll('.sidebar-link').forEach(link => {
+  link.addEventListener('click', () => {
+    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+    const tab = link.getAttribute('data-tab');
+    document.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
+    document.getElementById('pane-' + tab)?.classList.add('active');
+  });
+});
+
+// ─── Init ─────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   const settings = await window.api.getSettings();
   await applySettingsToUI(settings);

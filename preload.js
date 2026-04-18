@@ -16,6 +16,8 @@ const onDownloadLog = exposeListener('download-log');
 const onDownloadStarted = exposeListener('download-started');
 const onSetupProgress = exposeListener('setup-progress');
 const onSetupError = exposeListener('setup-error');
+const onSetupComplete = exposeListener('setup-complete');
+const onGpuRestartNeeded = exposeListener('gpu-restart-needed');
 
 contextBridge.exposeInMainWorld('api', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
@@ -35,6 +37,9 @@ contextBridge.exposeInMainWorld('api', {
   getYtdlpVersion: () => ipcRenderer.invoke('get-ytdlp-version'),
   updateBinaries: () => ipcRenderer.invoke('update-binaries'),
 
+  getHistory: () => ipcRenderer.invoke('get-history'),
+  clearHistory: () => ipcRenderer.invoke('clear-history'),
+
   onProgress: onDownloadProgress,
   onComplete: onDownloadComplete,
   onFailed: onDownloadFailed,
@@ -42,8 +47,7 @@ contextBridge.exposeInMainWorld('api', {
   onDownloadLog: onDownloadLog,
   onDownloadStarted: onDownloadStarted,
   onSetupProgress: onSetupProgress,
-  onSetupComplete: (callback) => {
-    ipcRenderer.on('setup-complete', () => callback());
-  },
-  onSetupError: onSetupError
+  onSetupComplete: onSetupComplete,
+  onSetupError: onSetupError,
+  onGpuRestartNeeded: onGpuRestartNeeded
 });

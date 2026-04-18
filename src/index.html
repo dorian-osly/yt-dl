@@ -116,7 +116,6 @@
                   <option value="128">128k</option>
                   <option value="96">96k</option>
                   <option value="64">64k</option>
-                  <option value="8">8k</option>
                 </select>
               </div>
             </div>
@@ -128,7 +127,6 @@
               <button class="segment" data-mode="audio" id="mode-audio" data-i18n="modeAudio">Audio</button>
             </div>
 
-            <!-- Tune button to toggle per-video settings -->
             <button class="btn-icon no-drag pv-toggle-btn" id="per-video-toggle" title="Options pour ce téléchargement">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
@@ -140,6 +138,10 @@
 
             <button class="btn btn-secondary hidden" id="cancel-btn" data-i18n="cancelBtn">Annuler</button>
             <button class="btn btn-primary" id="download-btn"><span class="btn-text" data-i18n="downloadBtn">Télécharger</span></button>
+          </div>
+
+          <div id="main-progress-bar-container" class="main-progress-bar-container hidden">
+            <div class="progress-bar" id="main-progress-bar"></div>
           </div>
 
           <div id="status-section" class="status-section hidden">
@@ -180,6 +182,10 @@
               <button class="sidebar-link" data-tab="advanced">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> 
                 <span data-i18n="tabAdvanced">avancé</span>
+              </button>
+              <button class="sidebar-link" data-tab="history">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 
+                <span data-i18n="tabHistory">historique</span>
               </button>
             </nav>
             
@@ -291,6 +297,43 @@
                   </div>
                   <div class="setting-desc" data-i18n="descVideoContainer">quand "auto" est sélectionné, le format idéal sera choisi en fonction du codec.</div>
                 </div>
+
+                <div class="setting-block">
+                  <div class="setting-row">
+                    <div class="setting-label">
+                      <span data-i18n="lblWriteSubs">Sous-titres</span>
+                    </div>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="setting-write-subs">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  <div class="setting-desc" data-i18n="descWriteSubs">télécharge les sous-titres si disponibles.</div>
+                </div>
+
+                <div class="setting-block">
+                  <div class="setting-header">
+                    <span data-i18n="lblSubsLang">langue des sous-titres</span>
+                  </div>
+                  <div class="modern-segmented" id="setting-subs-lang">
+                    <button class="modern-segment" data-val="en">English</button>
+                    <button class="modern-segment" data-val="fr">Français</button>
+                    <button class="modern-segment" data-val="de">Deutsch</button>
+                    <button class="modern-segment" data-val="es">Español</button>
+                    <button class="modern-segment" data-val="ja">日本語</button>
+                  </div>
+                </div>
+
+                <div class="setting-block">
+                  <div class="setting-header">
+                    <span data-i18n="lblSponsorblock">SponsorBlock</span>
+                  </div>
+                  <div class="modern-segmented" id="setting-sponsorblock">
+                    <button class="modern-segment" data-val="" data-i18n="optSponsorblockNone">Désactivé</button>
+                    <button class="modern-segment" data-val="all" data-i18n="optSponsorblockAll">Tout marquer</button>
+                  </div>
+                  <div class="setting-desc" data-i18n="descSponsorblock">marque les segments sponsorisés dans la barre de progression du lecteur vidéo.</div>
+                </div>
               </div>
 
               <div class="settings-pane" id="pane-audio">
@@ -317,7 +360,6 @@
                     <button class="modern-segment" data-val="128">128k</button>
                     <button class="modern-segment" data-val="96">96k</button>
                     <button class="modern-segment" data-val="64">64k</button>
-                    <button class="modern-segment" data-val="8">8k</button>
                   </div>
                 </div>
 
@@ -357,6 +399,19 @@
                     <button class="btn btn-secondary text-mono btn-small-mono danger-button" id="reset-config" data-i18n="btnReset">Réinitialiser</button>
                   </div>
                   <div class="setting-desc" data-i18n="descConfig">gérer les paramètres au format json.</div>
+                </div>
+
+                <div class="setting-block">
+                  <div class="setting-row">
+                    <div class="setting-label">
+                      <span data-i18n="lblDisableGpu">Désactiver l'accélération GPU</span>
+                    </div>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="setting-disable-gpu">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  <div class="setting-desc" data-i18n="descDisableGpu">à activer si l'application crash au lancement. nécessite un redémarrage.</div>
                 </div>
 
                 <div class="setting-block">
@@ -402,6 +457,18 @@
                     <button class="btn btn-secondary text-mono btn-small-mono" id="copy-last-cmd" data-i18n="btnCopyCmd">Copier la commande</button>
                   </div>
                   <div class="log-console" id="log-console"><span class="log-placeholder" data-i18n="logEmpty">En attente...</span></div>
+                </div>
+              </div>
+
+              <div class="settings-pane" id="pane-history">
+                <div class="setting-block">
+                  <div class="setting-header">
+                    <span data-i18n="historyTitle">Historique</span>
+                  </div>
+                  <div style="margin-bottom: 12px;">
+                    <button class="btn btn-secondary text-mono btn-small-mono danger-button" id="clear-history" data-i18n="historyClear">Vider l'historique</button>
+                  </div>
+                  <div id="history-list" class="history-list"></div>
                 </div>
               </div>
 
